@@ -137,8 +137,9 @@ static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 }
 
 static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
-        __attribute__((unused)) uint32_t *src_ip,
-        uint32_t *validation)
+				      UNUSED uint32_t *src_ip,
+				      uint32_t *validation,
+				      const struct port_conf *ports)
 {
 	if (ip_hdr->ip_p != IPPROTO_TCP) {
 		return PACKET_INVALID;
