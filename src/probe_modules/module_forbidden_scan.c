@@ -141,40 +141,38 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
         uint32_t *validation)
 {
 	if (ip_hdr->ip_p != IPPROTO_TCP) {
-		return 0;
+		return PACKET_INVALID;
 	}
-	if ((4 * ip_hdr->ip_hl + sizeof(struct tcphdr)) + 1 > len) {
-		// buffer not large enough to contain expected tcp header 
-		return 0;
+	
+	struct tcphdr *tcp = get_tcp_header(ip_hdr, len);
+	if (!tcp) {
+		return PACKET_INVALID;
 	}
-
-	struct tcphdr *tcp = (struct tcphdr *)((char *)ip_hdr + 4 * ip_hdr->ip_hl);
+	
 	uint16_t sport = tcp->th_sport;
 	uint16_t dport = tcp->th_dport;
-
-    // validate source port
-	if (ntohs(sport) != zconf.target_port) {
-		return 0;
+	// validate source port
+	if (!check_src_port(sport, ports)) {
+		return PACKET_INVALID;
 	}
 
 	// validate destination port
 	if (!check_dst_port(ntohs(dport), num_ports, validation)) {
-		return 0;
+		return PACKET_INVALID;
 	}
     
     int payloadlen = ntohs(ip_hdr->ip_len) - IP_LEN - (tcp->th_off * 4);
     
     if (payloadlen = 0) {
-      return 0;
+      return PACKET_INVALID;
     }
     
     if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN)/* &&  
         (htonl(tcp->th_ack) != htonl(validation[0])) &&
         (htonl(tcp->th_seq) != htonl(validation[2]))*/) {
-        return 0;
+        return PACKET_INVALID;
     }
-
-	return 1;
+	return PACKET_VALID;
 }
 
 static void forbiddenscan_process_packet(const u_char *packet,
