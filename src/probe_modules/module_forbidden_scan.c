@@ -154,17 +154,18 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
 		return PACKET_INVALID;
 	}
     
-    int payloadlen = ntohs(ip_hdr->ip_len) - IP_LEN - (tcp->th_off * 4);
+    /*int payloadlen = ntohs(ip_hdr->ip_len) - IP_LEN - (tcp->th_off * 4);
     
     if (payloadlen = 0) {
       return PACKET_INVALID;
-    }
+    }*/
     
-    if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN)/* &&  
+    if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN) &&  
         (htonl(tcp->th_ack) != htonl(validation[0])) &&
-        (htonl(tcp->th_seq) != htonl(validation[2]))*/) {
+        (htonl(tcp->th_seq) != htonl(validation[2]))) {
         return PACKET_INVALID;
     }
+    
 	return PACKET_VALID;
 }
 
