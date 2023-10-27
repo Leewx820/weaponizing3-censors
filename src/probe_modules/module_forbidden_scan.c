@@ -150,9 +150,9 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
 	}
 
 	// validate destination port
-	if (!check_dst_port(ntohs(dport), num_source_ports, validation)) {
+	/*if (!check_dst_port(ntohs(dport), num_source_ports, validation)) {
 		return PACKET_INVALID;
-	}
+	}*/
     
     /*int payloadlen = ntohs(ip_hdr->ip_len) - IP_LEN - (tcp->th_off * 4);
     
@@ -160,11 +160,11 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
       return PACKET_INVALID;
     }*/
     
-    if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN) &&  
+    /*if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN) &&  
         (htonl(tcp->th_ack) != htonl(validation[0])) &&
         (htonl(tcp->th_seq) != htonl(validation[2]))) {
         return PACKET_INVALID;
-    }
+    }*/
     
 	return PACKET_VALID;
 }
@@ -181,7 +181,6 @@ static void forbiddenscan_process_packet(const u_char *packet, UNUSED uint32_t l
     int mylen = ntohs(ip_hdr->ip_len);
     int payloadlen = mylen - IP_LEN - (tcp->th_off * 4);
     mylen += ETHER_LEN;
-
 
 	fs_add_uint64(fs, "sport", (uint64_t)ntohs(tcp->th_sport));
 	fs_add_uint64(fs, "dport", (uint64_t)ntohs(tcp->th_dport));
@@ -220,17 +219,13 @@ static fielddef_t myfields[] = {
     {.name = "flags", .type = "int", .desc = "Packet flags"},
     {.name = "ipid", .type = "int", .desc = "IP Identification"},
     {.name = "validation_type", .type = "int", .desc = "Type of Validation"},
-    {.name = "classification",
-        .type = "string",
-        .desc = "packet classification"},
-    {.name = "success",
-        .type = "bool",
-        .desc = "is response considered success"}};
+    {.name = "classification", .type = "string", .desc = "packet classification"},
+    {.name = "success", .type = "bool", .desc = "is response considered success"}};
 
 probe_module_t module_forbidden_scan = {
     .name = "forbidden_scan",
-    .max_packet_length = TOTAL_LEN + ETHER_LEN,
-    .max_packet2_length = TOTAL_LEN_PAYLOAD + ETHER_LEN,
+    .max_packet_length = ETHER_LEN + TOTAL_LEN,
+    .max_packet2_length = ETHER_LEN + TOTAL_LEN_PAYLOAD,
     .pcap_filter = "tcp", 
     .pcap_snaplen = 96,
     .port_args = 1,
