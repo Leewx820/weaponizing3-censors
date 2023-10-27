@@ -25,12 +25,12 @@
 #define IP_LEN sizeof(struct ip)
 
 probe_module_t module_tcp_forbiddenscan;
-static uint32_t num_ports;
+static uint32_t num_source_ports;
 
 static int forbiddenscan_global_initialize(struct state_conf *state)
 {
     printf("Starting module. Packet out size: %d\n", TOTAL_LEN_PAYLOAD + TOTAL_LEN);
-	num_ports = state->source_port_last - state->source_port_first + 1;
+	num_source_ports = state->source_port_last - state->source_port_first + 1;
 	return EXIT_SUCCESS;
 }
 
