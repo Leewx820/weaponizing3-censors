@@ -150,6 +150,12 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
 	if (!check_dst_port(ntohs(dport), num_ports, validation)) {
 		return 0;
 	}
+	
+    int mylen = ntohs(ip_hdr->ip_len);
+    int payloadlen = mylen - IP_LEN - (tcp->th_off * 4);
+    if (payloadlen = 0) {
+        return 0;
+    }
     
     if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN)/* &&  
         (htonl(tcp->th_ack) != htonl(validation[0])) &&
