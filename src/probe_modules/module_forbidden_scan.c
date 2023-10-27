@@ -150,7 +150,7 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
 	}
 
 	// validate destination port
-	if (!check_dst_port(ntohs(dport), num_ports, validation)) {
+	if (!check_dst_port(ntohs(dport), num_source_ports, validation)) {
 		return PACKET_INVALID;
 	}
     
