@@ -16,7 +16,6 @@
 #ifndef HOST
 #define HOST "www.youporn.com"
 #endif
-//#define TCP_FLAGS TH_PUSH | TH_ACK
 #define TCP_FLAGS TH_PUSH | TH_ACK
 #define PAYLOAD "GET / HTTP/1.1\r\nHost: " HOST "\r\n\r\n"
 #define PAYLOAD_LEN strlen(PAYLOAD) 
@@ -39,14 +38,12 @@ static int forbiddenscan_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw
         port_h_t dst_port,
         __attribute__((unused)) void **arg_ptr)
 {
-	memset(buf, 0, MAX_PACKET_SIZE);
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	make_eth_header(eth_header, src, gw);
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
-	uint16_t len = htons(sizeof(struct ip) + sizeof(struct tcphdr));
+	uint16_t len = htons(sizeof(struct ip) + ZMAP_TCP_SYNSCAN_TCP_HEADER_LEN);
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
-
 	make_tcp_header(tcp_header, TH_SYN);
 	return EXIT_SUCCESS;
 }
@@ -54,15 +51,14 @@ static int forbiddenscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *g
 				     port_h_t dst_port,
 				     __attribute__((unused)) void **arg_ptr)
 {
-	memset(buf, 0, MAX_PACKET_SIZE);
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	make_eth_header(eth_header, src, gw);
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
-	uint16_t len = htons(sizeof(struct ip) + sizeof(struct tcphdr) + PAYLOAD_LEN);
+	uint16_t len = htons(sizeof(struct ip) + ZMAP_TCP_SYNSCAN_TCP_HEADER_LEN);
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
-
 	make_tcp_header(tcp_header, TCP_FLAGS);
+	
 	char *payload = (char *)(&tcp_header[1]);
 	memcpy(payload, PAYLOAD, PAYLOAD_LEN);
 	return EXIT_SUCCESS;
@@ -76,29 +72,27 @@ static int forbiddenscan_make_packet(void *buf, size_t *buf_len, ipaddr_n_t src_
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
-    // Subtract one for the SYN packet
 	uint32_t tcp_seq = ntohl(htonl(validation[0]) - 1);
-	uint32_t tcp_ack = 0;
-	    //validation[2]; // get_src_port() below uses validation 1 internally.
 
 	ip_header->ip_src.s_addr = src_ip;
 	ip_header->ip_dst.s_addr = dst_ip;
 	ip_header->ip_ttl = ttl;
 
-	tcp_header->th_sport =
-	    htons(get_src_port(num_ports, probe_num, validation));
+	port_h_t sport = get_src_port(num_source_ports, probe_num, validation);
+	tcp_header->th_sport = htons(sport);
 	tcp_header->th_dport = dport;
 	tcp_header->th_seq = tcp_seq;
-	tcp_header->th_ack = tcp_ack;
+	tcp_header->th_ack = 0;
+	// checksum value must be zero when calculating packet's checksum
 	tcp_header->th_sum = 0;
-	tcp_header->th_sum =
-	    tcp_checksum(sizeof(struct tcphdr), ip_header->ip_src.s_addr,
-			 ip_header->ip_dst.s_addr, tcp_header);
-
+	tcp_header->th_sum = tcp_checksum(sizeof(struct tcphdr), 
+						ip_header->ip_src.s_addr,
+						ip_header->ip_dst.s_addr, tcp_header);
+	// checksum value must be zero when calculating packet's checksum
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
-	*buf_len = TOTAL_LEN;
+	*buf_len = ETHER_LEN + TOTAL_LEN;
 	return EXIT_SUCCESS;
 }
 static int forbiddenscan_make_packet2(void *buf, size_t *buf_len, ipaddr_n_t src_ip,
@@ -110,27 +104,27 @@ static int forbiddenscan_make_packet2(void *buf, size_t *buf_len, ipaddr_n_t src
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
 	uint32_t tcp_seq = validation[0];
-	uint32_t tcp_ack =
-	    validation[2]; // get_src_port() below uses validation 1 internally.
+	uint32_t tcp_ack = validation[2]; // get_src_port() below uses validation 1 internally.
 
 	ip_header->ip_src.s_addr = src_ip;
 	ip_header->ip_dst.s_addr = dst_ip;
 	ip_header->ip_ttl = ttl;
 
-	tcp_header->th_sport =
-	    htons(get_src_port(num_ports, probe_num, validation));
+	port_h_t sport = get_src_port(num_source_ports, probe_num, validation);
+	tcp_header->th_sport = htons(sport);
 	tcp_header->th_dport = dport;
 	tcp_header->th_seq = tcp_seq;
 	tcp_header->th_ack = tcp_ack;
+	// checksum value must be zero when calculating packet's checksum
 	tcp_header->th_sum = 0;
-	tcp_header->th_sum =
-	    tcp_checksum(sizeof(struct tcphdr) + PAYLOAD_LEN, ip_header->ip_src.s_addr,
-			 ip_header->ip_dst.s_addr, tcp_header);
-
+	tcp_header->th_sum = tcp_checksum(sizeof(struct tcphdr) + PAYLOAD_LEN, 
+						ip_header->ip_src.s_addr,
+						ip_header->ip_dst.s_addr, tcp_header);
+	// checksum value must be zero when calculating packet's checksum
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
-	*buf_len = TOTAL_LEN_PAYLOAD;
+	*buf_len = ETHER_LEN + TOTAL_LEN_PAYLOAD;
 	return EXIT_SUCCESS;
 }
 
