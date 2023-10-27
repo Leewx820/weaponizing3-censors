@@ -234,8 +234,8 @@ static fielddef_t myfields[] = {
 
 probe_module_t module_forbidden_scan = {
     .name = "forbidden_scan",
-    .packet_length = TOTAL_LEN + ETHER_LEN,
-    .packet2_length = TOTAL_LEN_PAYLOAD + ETHER_LEN,
+    .max_packet_length = TOTAL_LEN + ETHER_LEN,
+    .max_packet2_length = TOTAL_LEN_PAYLOAD + ETHER_LEN,
     .pcap_filter = "tcp", 
     .pcap_snaplen = 96,
     .port_args = 1,
