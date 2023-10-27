@@ -42,7 +42,7 @@ try:
         os.system("mv src/probe_modules/.backup src/probe_modules/module_forbidden_scan.c")
         time.sleep(1)
         if os.path.exists("%s/%s.csv" % (path, host)):
-			os.remove("%s/%s.csv" % (path, host))
+		   os.remove("%s/%s.csv" % (path, host))
         os.system("cmake . && make -j8 && sudo src/zmap -M forbidden_scan -p 80 -w ./cn.zone -f \"saddr,payloadlen,flags,validation_type\" -o %s/%s.csv -O csv -B %sM" % (path, host, gigbit))
         print("Scan for %s finished" % host)
         print("Sleeping for 60 seconds before next scan.")
