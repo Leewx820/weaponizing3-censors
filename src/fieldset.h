@@ -62,11 +62,10 @@ typedef struct field {
 typedef struct fieldset {
 	int len;
 	field_t fields[MAX_FIELDS];
-	fielddefset_t *fds;
 	// only used for repeated.
 	int inner_type; // type of repeated element. e.g., FS_STRING
-	int type;	// REPEATED or FIELDSET
-	int free_;	// should elements be freed
+	int type;       // REPEATED or FIELDSET
+	int free_;      // should elements be freed
 } fieldset_t;
 
 // we pass a different fieldset to an output module than
@@ -81,18 +80,18 @@ typedef struct translation {
 	int translation[MAX_FIELDS];
 } translation_t;
 
-fieldset_t *fs_new_fieldset(fielddefset_t *);
+fieldset_t *fs_new_fieldset(void);
 
 fieldset_t *fs_new_repeated_field(int type, int free_);
 fieldset_t *fs_new_repeated_uint64(void);
 fieldset_t *fs_new_repeated_bool(void);
 fieldset_t *fs_new_repeated_string(int free_);
 fieldset_t *fs_new_repeated_binary(int free_);
-fieldset_t *fs_new_repeated_fieldset(void);
+fieldset_t *fs_new_repeated_fieldset();
 
 char *fs_get_string_by_index(fieldset_t *fs, int index);
 
-int fds_get_index_by_name(fielddefset_t *fds, const char *name);
+int fds_get_index_by_name(fielddefset_t *fds, char *name);
 
 void gen_fielddef_set(fielddefset_t *fds, fielddef_t fs[], int len);
 
@@ -137,7 +136,7 @@ uint64_t fs_get_uint64_by_index(fieldset_t *fs, int index);
 void fs_free(fieldset_t *fs);
 
 void fs_generate_fieldset_translation(translation_t *t, fielddefset_t *avail,
-				      const char **req, int reqlen);
+				      char **req, int reqlen);
 
 fieldset_t *translate_fieldset(fieldset_t *fs, translation_t *t);
 

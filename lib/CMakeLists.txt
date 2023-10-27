@@ -1,6 +1,5 @@
 SET(LIB_SOURCES
-    blocklist.c
-    cachehash.c
+    blacklist.c
     constraint.c
     logger.c
     pbm.c
@@ -13,11 +12,10 @@ SET(LIB_SOURCES
     csv.c
 )
 
-add_library(zmaplib STATIC ${LIB_SOURCES})
+if (WITH_REDIS)
+    SET(LIB_SOURCES ${LIB_SOURCES} redis.c)
+endif()
 
-target_link_libraries(
-    zmaplib
-    ${JUDY_LIBRARIES}
-)
+add_library(zmaplib STATIC ${LIB_SOURCES})
 
 target_include_directories (zmaplib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

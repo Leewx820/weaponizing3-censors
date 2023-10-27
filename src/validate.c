@@ -18,10 +18,14 @@
 #define AES_KEY_BYTES 16
 
 static int inited = 0;
+static uint32_t aes_input[AES_BLOCK_WORDS];
 static uint32_t aes_sched[(AES_ROUNDS + 1) * 4];
 
-void validate_init(void)
+void validate_init()
 {
+	for (int i = 0; i < AES_BLOCK_WORDS; i++) {
+		aes_input[i] = 0;
+	}
 	uint8_t key[AES_KEY_BYTES];
 	if (!random_bytes(key, AES_KEY_BYTES)) {
 		log_fatal("validate", "couldn't get random bytes");
@@ -34,21 +38,10 @@ void validate_init(void)
 }
 
 void validate_gen(const uint32_t src, const uint32_t dst,
-		  const uint16_t dst_port, uint8_t output[VALIDATE_BYTES])
-{
-	validate_gen_ex(src, dst, (uint32_t)dst_port, 0, output);
-}
-
-void validate_gen_ex(const uint32_t input0, const uint32_t input1,
-		     const uint32_t input2, const uint32_t input3,
-		     uint8_t output[VALIDATE_BYTES])
+		  uint8_t output[VALIDATE_BYTES])
 {
 	assert(inited);
-
-	uint32_t aes_input[AES_BLOCK_WORDS];
-	aes_input[0] = input0;
-	aes_input[1] = input1;
-	aes_input[2] = input2;
-	aes_input[3] = input3;
+	aes_input[0] = src;
+	aes_input[1] = dst;
 	rijndaelEncrypt(aes_sched, AES_ROUNDS, (uint8_t *)aes_input, output);
 }

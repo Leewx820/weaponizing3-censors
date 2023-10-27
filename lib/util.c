@@ -1,19 +1,3 @@
-/*
- * Copyright 2021 Regents of the University of Michigan
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #define _GNU_SOURCE
 #include "util.h"
 
@@ -25,7 +9,6 @@
 #include "includes.h"
 #include "xalloc.h"
 
-#include <errno.h>
 #include <unistd.h>
 #include <sched.h>
 #include <pthread.h>
@@ -52,11 +35,11 @@ void enforce_range(const char *name, int v, int min, int max)
 	}
 }
 
-void split_string(const char *in, int *len, const char ***results)
+void split_string(char *in, int *len, char ***results)
 {
-	const char **fields = xcalloc(MAX_SPLITS, sizeof(const char *));
+	char **fields = xcalloc(MAX_SPLITS, sizeof(char *));
 	int retvlen = 0;
-	const char *currloc = in;
+	char *currloc = in;
 	// parse csv into a set of strings
 	while (1) {
 		assert(retvlen < MAX_SPLITS);
@@ -79,7 +62,7 @@ void split_string(const char *in, int *len, const char ***results)
 	*len = retvlen;
 }
 
-void fprintw(FILE *f, const char *s, size_t w)
+void fprintw(FILE *f, char *s, size_t w)
 {
 	if (strlen(s) <= w) {
 		fprintf(f, "%s", s);
@@ -130,8 +113,8 @@ void fprintw(FILE *f, const char *s, size_t w)
 
 uint32_t parse_max_hosts(char *max_targets)
 {
+	int errno = 0;
 	char *end;
-	errno = 0;
 	double v = strtod(max_targets, &end);
 	if (end == max_targets || errno != 0) {
 		log_fatal("argparse", "can't convert max-targets to a number");
@@ -254,7 +237,7 @@ int file_exists(char *name)
 #include <uuid/uuid.h>
 #endif
 
-int drop_privs(void)
+int drop_privs()
 {
 	struct passwd *pw;
 	if (geteuid() != 0) {
@@ -341,23 +324,3 @@ int set_cpu(uint32_t core)
 }
 
 #endif
-
-double now(void)
-{
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	return (double)now.tv_sec + (double)now.tv_usec / 1000000.;
-}
-
-double steady_now(void)
-{
-#if defined(_POSIX_TIMERS) && defined(_POSIX_MONOTONIC_CLOCK)
-	struct timespec tp;
-	clock_gettime(CLOCK_MONOTONIC, &tp);
-	return (double)tp.tv_sec + (double)tp.tv_nsec / 1000000000.;
-#else
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	return (double)now.tv_sec + (double)now.tv_usec / 1000000.;
-#endif
-}

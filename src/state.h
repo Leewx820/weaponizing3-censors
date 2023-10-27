@@ -26,13 +26,6 @@
 #define MAX_PACKET_SIZE 4096
 #define MAC_ADDR_LEN_BYTES 6
 
-#define DEDUP_METHOD_DEFAULT 0
-#define DEDUP_METHOD_NONE 1
-#define DEDUP_METHOD_FULL 2
-#define DEDUP_METHOD_WINDOW 3
-
-extern const char *const DEDUP_METHOD_NAMES[];
-
 struct probe_module;
 struct output_module;
 
@@ -48,16 +41,16 @@ struct fieldset_conf {
 // global configuration
 struct state_conf {
 	int log_level;
-	struct port_conf *ports;
+	port_h_t target_port;
 	port_h_t source_port_first;
 	port_h_t source_port_last;
 	// maximum number of packets that the scanner will send before
 	// terminating
-	uint64_t max_targets;
+	uint32_t max_targets;
 	// maximum number of seconds that scanner will run before terminating
 	uint32_t max_runtime;
 	// maximum number of results before terminating
-	uint64_t max_results;
+	uint32_t max_results;
 	// name of network interface that
 	// will be utilized for sending/receiving
 	char *iface;
@@ -71,7 +64,6 @@ struct state_conf {
 	int cooldown_secs;
 	// number of sending threads
 	uint8_t senders;
-	uint8_t batch;
 	uint32_t pin_cores_len;
 	uint32_t *pin_cores;
 	// should use CLI provided randomization seed instead of generating
@@ -101,8 +93,8 @@ struct state_conf {
 	uint32_t number_source_ips;
 	int send_ip_pkts;
 	char *output_filename;
-	char *blocklist_filename;
-	char *allowlist_filename;
+	char *blacklist_filename;
+	char *whitelist_filename;
 	char *list_of_ips_filename;
 	uint32_t list_of_ips_count;
 	char *metadata_filename;
@@ -111,8 +103,8 @@ struct state_conf {
 	char *custom_metadata_str;
 	char **destination_cidrs;
 	int destination_cidrs_len;
-	const char *raw_output_fields;
-	const char **output_fields;
+	char *raw_output_fields;
+	char **output_fields;
 	struct output_filter filter;
 	char *output_filter_str;
 	struct fieldset_conf fsconf;
@@ -124,6 +116,8 @@ struct state_conf {
 	int quiet;
 	int ignore_invalid_hosts;
 	int syslog;
+	int filter_duplicates;
+	int filter_unsuccessful;
 	int recv_ready;
 	int num_retries;
 	uint64_t total_allowed;
@@ -131,10 +125,6 @@ struct state_conf {
 	int max_sendto_failures;
 	float min_hitrate;
 	int data_link_size;
-	int default_mode;
-	int no_header_row;
-	int dedup_method;
-	int dedup_window_size;
 #ifdef PFRING
 	struct {
 		pfring_zc_cluster *cluster;
@@ -148,21 +138,20 @@ struct state_conf {
 };
 extern struct state_conf zconf;
 
-void init_empty_global_configuration(struct state_conf *c);
-
 // global sender stats
 struct state_send {
 	double start;
 	double finish;
-	uint64_t packets_sent;
-	uint64_t targets_scanned;
+	uint32_t sent;
+	uint32_t tried_sent;
+	uint32_t blacklisted;
+	uint32_t whitelisted;
 	int warmup;
 	int complete;
 	uint32_t first_scanned;
 	uint32_t max_targets;
 	uint32_t sendto_failures;
 	uint32_t max_index;
-	uint16_t max_port_index;
 	uint8_t **list_of_ips_pbm;
 };
 extern struct state_send zsend;
@@ -184,7 +173,7 @@ struct state_recv {
 	// valid responses NOT classified as "success"
 	uint32_t failure_total;
 	// valid responses that passed the filter
-	uint64_t filter_success;
+	uint32_t filter_success;
 	// how many packets did we receive that were marked as being the first
 	// fragment in a stream
 	uint32_t ip_fragments;
@@ -206,11 +195,5 @@ struct state_recv {
 	uint32_t pcap_ifdrop;
 };
 extern struct state_recv zrecv;
-
-struct port_conf {
-	int port_count;
-	uint16_t ports[0xFFFF + 1];
-	uint8_t *port_bitmap;
-};
 
 #endif // _STATE_H

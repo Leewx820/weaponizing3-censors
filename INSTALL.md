@@ -2,16 +2,16 @@
 
 ## Installing via Package Manager
 
-ZMap operates on GNU/Linux, macOS, and BSD. The latest stable version may be available in package managers.
+ZMap operates on GNU/Linux, macOS, and BSD. The latest stable version (v2.1.1)
+can be installed using most OS package managers:
 
 | OS                                        |                         |
 | ----------------------------------------- | ----------------------- |
-| Fedora 19+ or EPEL 6+                     | `yum install zmap` |
-| Debian 8+ or Ubuntu 14.04+                | `apt install zmap` |
-| Gentoo                                    | `emerge zmap`      |
+| Fedora 19+ or EPEL 6+                     | `sudo yum install zmap` |
+| Debian 8+ or Ubuntu 14.04+                | `sudo apt install zmap` |
+| Gentoo                                    | `sudo emerge zmap`      |
 | macOS (using [Homebrew](https://brew.sh)) | `brew install zmap`     |
-| macOS (using [MacPorts](https://macports.org)) | `port install zmap`|
-| Arch Linux                                | `pacman -S zmap`   |
+| Arch Linux                                | `sudo pacman -S zmap`   |
 
 ## Building from Source
 
@@ -20,42 +20,33 @@ ZMap operates on GNU/Linux, macOS, and BSD. The latest stable version may be ava
 ZMap has the following dependencies:
 
   - [CMake](http://www.cmake.org/) - Cross-platform, open-source build system
-  - [GMP](http://gmplib.org/) - Arbitrary precision arithmetic
-  - [gengetopt](http://www.gnu.org/software/gengetopt/gengetopt.html) - Command line option parsing
-  - [libpcap](http://www.tcpdump.org/) - User-level packet capture library
-  - [flex](http://flex.sourceforge.net/) and [byacc](http://invisible-island.net/byacc/) - Lexer and parser generator
-  - [json-c](https://github.com/json-c/json-c/) - JSON parsing and output
-  - [libunistring](https://www.gnu.org/software/libunistring/) - Unicode string library
-  - [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/) - compiler and library helper tool
-  - [libjudy](https://judy.sourceforge.net/) - Judy Array for packet de-duplication
+  - [GMP](http://gmplib.org/) - Free library for arbitrary precision arithmetic
+  - [gengetopt](http://www.gnu.org/software/gengetopt/gengetopt.html) - Command line option parsing for C programs
+  - [libpcap](http://www.tcpdump.org/) - Famous user-level packet capture library
+  - [flex](http://flex.sourceforge.net/) and [byacc](http://invisible-island.net/byacc/) - Output filter lexer and parser generator
+  - [json-c](https://github.com/json-c/json-c/) - JSON implementation in C
+  - [libunistring](https://www.gnu.org/software/libunistring/) - Unicode string library for C
   - [libdnet](https://github.com/dugsong/libdnet) - (macOS Only) Gateway and route detection
+
+In addition, the following optional packages enable optional ZMap functionality:
+
+  - [hiredis](https://github.com/redis/hiredis) - RedisDB support in C
 
 Install the required dependencies with the following commands.
 
 * On Debian-based systems (including Ubuntu):
    ```sh
-   sudo apt-get install build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev libjudy-dev
+   sudo apt-get install build-essential cmake libgmp3-dev gengetopt libpcap-dev flex byacc libjson-c-dev pkg-config libunistring-dev
    ```
 
 * On RHEL- and Fedora-based systems (including CentOS):
    ```sh
-   sudo yum install cmake gmp-devel gengetopt libpcap-devel flex byacc json-c-devel libunistring-devel libjudy-devel
+   sudo yum install cmake gmp-devel gengetopt libpcap-devel flex byacc json-c-devel libunistring-devel
    ```
 
-* On macOS systems (using [Homebrew](https://brew.sh/)):
+* On macOS systems (using [Homebrew](http://brew.sh/)):
   ```sh
-  brew install pkg-config cmake gmp gengetopt json-c byacc libdnet libunistring judy
-  ```
-
-* On macOS systems (using [MacPorts](https://macports.org/)):
-  ```
-  sudo port install cmake byacc flex gengetopt pkgconfig gmp libdnet libpcap json-c libunistring judy
-  ```
-
-* To launch a shell inside a Docker container with the build dependencies
-  mounted at `/src`:
-  ```sh
-  docker run -it -v $(pwd):/src zmap/builder
+  brew install pkg-config cmake gmp gengetopt json-c byacc libdnet libunistring
   ```
 
 ### Building and Installing ZMap
@@ -75,6 +66,11 @@ Release builds should be built with `-DENABLE_DEVELOPMENT=OFF`.
 
 - Enabling `log_trace` can have a major performance impact and should not be used
 except during early development. Release builds should be built with `-DENABLE_LOG_TRACE=OFF`.
+
+- Redis support is not enabled by default. If you want to use ZMap with Redis,
+you will first need to install hiredis. Then run cmake with `-DWITH_REDIS=ON`.
+Debian/Ubuntu has packaged hiredis as `libhiredis-dev`; Fedora and RHEL/CentOS
+have packaged it as `hiredis-devel`.
 
 - Building packages for some systems like Fedora and RHEL requires a user-definable
 directory (buildroot) to put files. The way to respect this prefix is to run cmake
@@ -97,4 +93,3 @@ option. For example, to install it in `$HOME/opt` run
     make -j4
     make install
     ```
-- On some BSD systems, you man need to manually add `-D_SYSTYPE_BSD` to your CFLAGS.

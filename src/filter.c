@@ -15,7 +15,7 @@
 
 #include <string.h>
 
-extern int yyparse(void);
+extern int yyparse();
 
 node_t *zfilter;
 

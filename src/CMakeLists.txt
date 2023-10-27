@@ -20,6 +20,11 @@ set(OUTPUT_MODULE_SOURCES
     output_modules/output_modules.c
 )
 
+# Handle optional output modules
+if(WITH_REDIS)
+    set(OUTPUT_MODULE_SOURCES ${OUTPUT_MODULE_SOURCES} output_modules/module_redis_packed.c output_modules/module_redis_csv.c)
+endif()
+
 set(PROBE_MODULE_SOURCES
     probe_modules/module_icmp_echo.c
     probe_modules/module_icmp_echo_time.c
@@ -45,7 +50,6 @@ set(SOURCES
     get_gateway.c
     iterator.c
     monitor.c
-    ports.c
     recv.c
     send.c
     shard.c
@@ -74,7 +78,6 @@ set(ZTESTSOURCES
     get_gateway.c
     iterator.c
     monitor.c
-    ports.c
     recv.c
     send.c
     shard.c
@@ -94,7 +97,7 @@ set(ZTESTSOURCES
 )
 
 set(ZBLSOURCES
-    zblocklist.c
+    zblacklist.c
     zbopt_compat.c
     "${CMAKE_CURRENT_BINARY_DIR}/zbopt.h"
 )
@@ -103,7 +106,6 @@ set(ZITSOURCES
     aesrand.c
     cyclic.c
     iterator.c
-	ports.c
     shard.c
     state.c
     validate.c
@@ -197,15 +199,15 @@ add_custom_command(OUTPUT parser.c
 endif()
 
 add_custom_target(manpages ronn "${CMAKE_CURRENT_SOURCE_DIR}/zmap.1.ronn" --organization="ZMap" --manual="zmap"
-    COMMAND ronn "${CMAKE_CURRENT_SOURCE_DIR}/zblocklist.1.ronn" --organization="ZMap" --manual="zblocklist"
+    COMMAND ronn "${CMAKE_CURRENT_SOURCE_DIR}/zblacklist.1.ronn" --organization="ZMap" --manual="zblacklist"
     COMMAND ronn "${CMAKE_CURRENT_SOURCE_DIR}/ziterate.1.ronn" --organization="ZMap" --manual="ziterate"
     COMMAND ronn "${CMAKE_CURRENT_SOURCE_DIR}/ztee.1.ronn" --organization="ZMap" --manual="ztee"
-    SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/zblocklist.1.ronn" "${CMAKE_CURRENT_SOURCE_DIR}/ziterate.1.ronn" "${CMAKE_CURRENT_SOURCE_DIR}/zmap.1.ronn" "${CMAKE_CURRENT_SOURCE_DIR}/ztee.1.ronn"
+    SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/zblacklist.1.ronn" "${CMAKE_CURRENT_SOURCE_DIR}/ziterate.1.ronn" "${CMAKE_CURRENT_SOURCE_DIR}/zmap.1.ronn" "${CMAKE_CURRENT_SOURCE_DIR}/ztee.1.ronn"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
 add_executable(zmap ${SOURCES})
-add_executable(zblocklist ${ZBLSOURCES})
+add_executable(zblacklist ${ZBLSOURCES})
 add_executable(ziterate ${ZITSOURCES})
 add_executable(ztee ${ZTEESOURCES})
 add_executable(ztests ${ZTESTSOURCES})
@@ -222,12 +224,12 @@ target_link_libraries(
     ${PFRING_LIBRARIES}
     pcap gmp m unistring
     ${DNET_LIBRARIES}
+    ${REDIS_LIBS}
     ${JSON_LIBRARIES}
-	${JUDY_LIBRARIES}
 )
 
 target_link_libraries(
-    zblocklist
+    zblacklist
     zmaplib
     m
 )
@@ -251,15 +253,15 @@ target_link_libraries(
     ${PFRING_LIBRARIES}
     pcap gmp m unistring
     ${DNET_LIBRARIES}
+    ${REDIS_LIBS}
     ${JSON_LIBRARIES}
-	${JUDY_LIBRARIES}
 )
 
 # Install binary
 install(
     TARGETS
     zmap
-    zblocklist
+    zblacklist
     ziterate
     ztee
     RUNTIME DESTINATION sbin
@@ -269,7 +271,7 @@ install(
 install(
     FILES
     zmap.1
-    zblocklist.1
+    zblacklist.1
     ziterate.1
     ztee.1
     DESTINATION share/man/man1
