@@ -241,17 +241,6 @@ int send_run(sock_t st, shard_t *s)
 			p += 3;
 		}
 	}
-	char mac_buf2[(ETHER_ADDR_LEN * 2) + (ETHER_ADDR_LEN - 1) + 1];
-	char *p = mac_buf2;
-	for (int i = 0; i < ETHER_ADDR_LEN; i++) {
-		if (i == ETHER_ADDR_LEN - 1) {
-			snprintf(p, 3, "%.2x", zconf.hw_mac[i]);
-			p += 2;
-		} else {
-			snprintf(p, 4, "%.2x:", zconf.hw_mac[i]);
-			p += 3;
-		}
-	}
 	log_debug("send", "source MAC address %s", mac_buf);
 	void *probe_data;
 	if (zconf.probe_module->thread_initialize) {

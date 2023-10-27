@@ -87,8 +87,8 @@ typedef struct probe_module {
 	probe_thread_init_cb thread_initialize;
 	probe_thread_init_cb thread_initialize2;
 	probe_make_packet_cb make_packet;
+	probe_make_packet_cb make_packet2;
 	probe_print_packet_cb print_packet;
-	probe_print_packet_cb print_packet2;
 	probe_validate_packet_cb validate_packet;
 	probe_classify_packet_cb process_packet;
 	probe_close_cb close;
