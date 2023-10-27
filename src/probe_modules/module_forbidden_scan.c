@@ -176,11 +176,10 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
 	return PACKET_VALID;
 }
 
-static void forbiddenscan_process_packet(const u_char *packet,
-        uint32_t len,
-        fieldset_t *fs,
-        __attribute__((unused))
-        uint32_t *validation)
+static void forbiddenscan_process_packet(const u_char *packet, UNUSED uint32_t len,
+				      fieldset_t *fs,
+				      UNUSED uint32_t *validation,
+				      UNUSED struct timespec ts)
 {
 	struct ip *ip_hdr = (struct ip *)&packet[sizeof(struct ether_header)];
 	struct tcphdr *tcp =
