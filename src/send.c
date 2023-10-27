@@ -245,9 +245,11 @@ int send_run(sock_t st, shard_t *s)
 	void *probe_data;
 	if (zconf.probe_module->thread_initialize) {
 		zconf.probe_module->thread_initialize(
-		    buf, zconf.hw_mac, zconf.gw_mac, &probe_data);
-		zconf.probe_module->thread_initialize2(
-		    buf, zconf.hw_mac, zconf.gw_mac, &probe_data);		    
+		    buf, zconf.hw_mac, zconf.gw_mac, &probe_data);    
+	}
+	if (zconf.probe_module->thread_initialize2) {
+			zconf.probe_module->thread_initialize2(
+		    buf2, zconf.hw_mac, zconf.gw_mac, &probe_data);		 
 	}
 	pthread_mutex_unlock(&send_mutex);
 
