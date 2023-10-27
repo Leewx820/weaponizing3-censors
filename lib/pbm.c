@@ -1,19 +1,3 @@
-/*
- * Copyright 2021 Regents of the University of Michigan
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -40,21 +24,14 @@ uint8_t **pbm_init(void)
 	return retv;
 }
 
-uint8_t *bm_init(void)
-{
-	uint8_t *bm = xmalloc(PAGE_SIZE_IN_BYTES);
-	memset(bm, 0, PAGE_SIZE_IN_BYTES);
-	return bm;
-}
-
-int bm_check(uint8_t *bm, uint16_t v)
+static inline int bm_check(uint8_t *bm, uint16_t v)
 {
 	uint16_t page_idx = (v >> 3);
 	uint8_t bit_idx = (uint8_t)(v & 0x07);
 	return bm[page_idx] & (1 << bit_idx);
 }
 
-void bm_set(uint8_t *bm, uint16_t v)
+static inline void bm_set(uint8_t *bm, uint16_t v)
 {
 	uint16_t page_idx = (v >> 3);
 	uint8_t bit_idx = (uint8_t)(v & 0x07);
@@ -73,7 +50,9 @@ void pbm_set(uint8_t **b, uint32_t v)
 	uint16_t top = (uint16_t)(v >> 16);
 	uint16_t bottom = (uint16_t)(v & PAGE_MASK);
 	if (!b[top]) {
-		b[top] = bm_init();
+		uint8_t *bm = xmalloc(PAGE_SIZE_IN_BYTES);
+		memset(bm, 0, PAGE_SIZE_IN_BYTES);
+		b[top] = bm;
 	}
 	bm_set(b[top], bottom);
 }

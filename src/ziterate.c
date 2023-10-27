@@ -1,5 +1,5 @@
 /*
- * ZMap Copyright 2023 Regents of the University of Michigan
+ * ZMap Copyright 2016 Regents of the University of Michigan
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy
@@ -22,21 +22,19 @@
 #include <unistd.h>
 
 #include "../lib/includes.h"
-#include "../lib/blocklist.h"
+#include "../lib/blacklist.h"
 #include "../lib/logger.h"
 #include "../lib/random.h"
 #include "../lib/util.h"
-#include "../lib/xalloc.h"
 
 #include "iterator.h"
-#include "ports.h"
 #include "state.h"
 #include "validate.h"
 #include "zitopt.h"
 
 struct zit_conf {
-	char *blocklist_filename;
-	char *allowlist_filename;
+	char *blacklist_filename;
+	char *whitelist_filename;
 	char **destination_cidrs;
 	int destination_cidrs_len;
 	char *log_filename;
@@ -98,7 +96,7 @@ int main(int argc, char **argv)
 		conf.verbosity = args.verbosity_arg;
 	}
 	// Read the boolean flags
-	SET_BOOL(conf.ignore_errors, ignore_blocklist_errors);
+	SET_BOOL(conf.ignore_errors, ignore_blacklist_errors);
 	SET_BOOL(conf.disable_syslog, disable_syslog);
 
 	// initialize logging
@@ -119,12 +117,12 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	// Blocklist and allowlist
-	if (args.blocklist_file_given) {
-		conf.blocklist_filename = strdup(args.blocklist_file_arg);
+	// Blacklist and whitelist
+	if (args.blacklist_file_given) {
+		conf.blacklist_filename = strdup(args.blacklist_file_arg);
 	}
-	if (args.allowlist_file_given) {
-		conf.allowlist_filename = strdup(args.allowlist_file_arg);
+	if (args.whitelist_file_given) {
+		conf.whitelist_filename = strdup(args.whitelist_file_arg);
 	}
 	conf.destination_cidrs = args.inputs;
 	conf.destination_cidrs_len = args.inputs_num;
@@ -133,40 +131,40 @@ int main(int argc, char **argv)
 		conf.max_hosts = parse_max_hosts(args.max_targets_arg);
 	}
 
-	// sanity check blocklist file
-	if (conf.blocklist_filename) {
-		log_debug("ziterate", "blocklist file at %s to be used",
-			  conf.blocklist_filename);
+	// sanity check blacklist file
+	if (conf.blacklist_filename) {
+		log_debug("ziterate", "blacklist file at %s to be used",
+			  conf.blacklist_filename);
 	} else {
-		log_debug("ziterate", "no blocklist file specified");
+		log_debug("ziterate", "no blacklist file specified");
 	}
-	if (conf.blocklist_filename &&
-	    access(conf.blocklist_filename, R_OK) == -1) {
+	if (conf.blacklist_filename &&
+	    access(conf.blacklist_filename, R_OK) == -1) {
 		log_fatal("ziterate",
-			  "unable to read specified blocklist file (%s)",
-			  conf.blocklist_filename);
+			  "unable to read specified blacklist file (%s)",
+			  conf.blacklist_filename);
 	}
 
-	// sanity check allowlist file
-	if (conf.allowlist_filename) {
-		log_debug("ziterate", "allowlist file at %s to be used",
-			  conf.allowlist_filename);
+	// sanity check whitelist file
+	if (conf.whitelist_filename) {
+		log_debug("ziterate", "whitelist file at %s to be used",
+			  conf.whitelist_filename);
 	} else {
-		log_debug("ziterate", "no allowlist file specified");
+		log_debug("ziterate", "no whitelist file specified");
 	}
-	if (conf.allowlist_filename &&
-	    access(conf.allowlist_filename, R_OK) == -1) {
+	if (conf.whitelist_filename &&
+	    access(conf.whitelist_filename, R_OK) == -1) {
 		log_fatal("ziterate",
-			  "unable to read specified allowlist file (%s)",
-			  conf.allowlist_filename);
+			  "unable to read specified whitelist file (%s)",
+			  conf.whitelist_filename);
 	}
 
-	// parse blocklist and allowlist
-	if (blocklist_init(conf.allowlist_filename, conf.blocklist_filename,
+	// parse blacklist and whitelist
+	if (blacklist_init(conf.whitelist_filename, conf.blacklist_filename,
 			   conf.destination_cidrs, conf.destination_cidrs_len,
 			   NULL, 0, conf.ignore_errors)) {
 		log_fatal("ziterate",
-			  "unable to initialize blocklist / allowlist");
+			  "unable to initialize blacklist / whitelist");
 	}
 
 	// Set up sharding
@@ -211,36 +209,18 @@ int main(int argc, char **argv)
 	}
 	zconf.aes = aesrand_init_from_seed(conf.seed);
 
-	zconf.ports = xmalloc(sizeof(struct port_conf));
-	if (args.target_ports_given) {
-		parse_ports(args.target_ports_arg, zconf.ports);
-	} else {
-		zconf.ports->port_count = 1;
-	}
-
-	uint64_t num_addrs = blocklist_count_allowed();
-	if (zconf.list_of_ips_filename) {
-		log_debug("send",
-			  "forcing max group size for compatibility with -I");
-		num_addrs = 0xFFFFFFFF;
-	}
-	iterator_t *it = iterator_init(1, conf.shard_num, conf.total_shards,
-				       num_addrs, zconf.ports->port_count);
+	iterator_t *it = iterator_init(1, conf.shard_num, conf.total_shards);
 	shard_t *shard = get_shard(it, 0);
+	uint32_t next_int = shard_get_cur_ip(shard);
+	struct in_addr next_ip;
 
-	target_t current = shard_get_cur_target(shard);
-	for (uint32_t count = 0; current.ip; ++count) {
+	for (uint32_t count = 0; next_int; ++count) {
 		if (conf.max_hosts && count >= conf.max_hosts) {
 			break;
 		}
-		struct in_addr next_ip;
-		next_ip.s_addr = current.ip;
-		if (current.port) {
-			printf("%s,%u\n", inet_ntoa(next_ip), current.port);
-		} else {
-			printf("%s\n", inet_ntoa(next_ip));
-		}
-		current = shard_get_next_target(shard);
+		next_ip.s_addr = next_int;
+		printf("%s\n", inet_ntoa(next_ip));
+		next_int = shard_get_next_ip(shard);
 	}
 	return EXIT_SUCCESS;
 }

@@ -20,7 +20,7 @@
 
 #include <pcap.h>
 #include <pcap/pcap.h>
-#if defined __linux__ && __linux__
+#if __linux__
 #include <pcap/sll.h>
 #endif
 
@@ -37,7 +37,6 @@ static pcap_t *pc = NULL;
 void packet_cb(u_char __attribute__((__unused__)) * user,
 	       const struct pcap_pkthdr *p, const u_char *bytes)
 {
-	struct timespec ts;
 	if (!p) {
 		return;
 	}
@@ -50,14 +49,12 @@ void packet_cb(u_char __attribute__((__unused__)) * user,
 
 	// length of entire packet captured by libpcap
 	uint32_t buflen = (uint32_t)p->caplen;
-	ts.tv_sec = p->ts.tv_sec;
-	ts.tv_nsec = p->ts.tv_usec * 1000;
-	handle_packet(buflen, bytes, ts);
+	handle_packet(buflen, bytes);
 }
 
 #define BPFLEN 1024
 
-void recv_init(void)
+void recv_init()
 {
 	char bpftmp[BPFLEN];
 	char errbuf[PCAP_ERRBUF_SIZE];
@@ -70,14 +67,14 @@ void recv_init(void)
 	}
 	switch (pcap_datalink(pc)) {
 	case DLT_EN10MB:
-		log_debug("recv", "Data link layer Ethernet");
+		log_info("recv", "Data link layer Ethernet");
 		zconf.data_link_size = sizeof(struct ether_header);
 		break;
 	case DLT_RAW:
 		log_info("recv", "Data link RAW");
 		zconf.data_link_size = 0;
 		break;
-#if defined __linux__ && __linux__
+#if __linux__
 	case DLT_LINUX_SLL:
 		log_info("recv", "Data link cooked socket");
 		zconf.data_link_size = SLL_HDR_LEN;
@@ -124,7 +121,7 @@ void recv_init(void)
 	}
 }
 
-void recv_packets(void)
+void recv_packets()
 {
 	int ret = pcap_dispatch(pc, -1, packet_cb, NULL);
 	if (ret == -1) {
@@ -134,7 +131,7 @@ void recv_packets(void)
 	}
 }
 
-void recv_cleanup(void)
+void recv_cleanup()
 {
 	pcap_close(pc);
 	pc = NULL;

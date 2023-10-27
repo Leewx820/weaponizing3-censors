@@ -17,7 +17,7 @@
 
 #include "../lib/includes.h"
 #include "../lib/logger.h"
-#include "../lib/blocklist.h"
+#include "../lib/blacklist.h"
 
 #include "state.h"
 #include "probe_modules/probe_modules.h"
@@ -41,8 +41,8 @@ void json_metadata(FILE *file)
 	char recv_end_time[STRTIME_LEN + 1];
 	assert(dstrftime(recv_end_time, STRTIME_LEN, "%Y-%m-%dT%H:%M:%S%z",
 			 zrecv.finish));
-	double hitrate = ((double)100 * zrecv.success_unique) /
-			 ((double)zsend.targets_scanned);
+	double hitrate =
+	    ((double)100 * zrecv.success_unique) / ((double)zsend.sent);
 
 	json_object *obj = json_object_new_object();
 
@@ -64,22 +64,13 @@ void json_metadata(FILE *file)
 				  "unable to retrieve complete hostname");
 		}
 	}
-	if (zconf.ports) {
-		json_object_object_add(
-		    obj, "source_port_first",
-		    json_object_new_int(zconf.source_port_first));
-		json_object_object_add(
-		    obj, "source_port_last",
-		    json_object_new_int(zconf.source_port_last));
 
-		json_object *target_ports = json_object_new_array();
-		for (int i = 0; i < zconf.ports->port_count; i++) {
-			json_object_array_add(
-			    target_ports,
-			    json_object_new_int(zconf.ports->ports[i]));
-		}
-		json_object_object_add(obj, "target_ports", target_ports);
-	}
+	json_object_object_add(obj, "target_port",
+			       json_object_new_int(zconf.target_port));
+	json_object_object_add(obj, "source_port_first",
+			       json_object_new_int(zconf.source_port_first));
+	json_object_object_add(obj, "source_port_last",
+			       json_object_new_int(zconf.source_port_last));
 	json_object_object_add(obj, "max_targets",
 			       json_object_new_int(zconf.max_targets));
 	json_object_object_add(obj, "max_runtime",
@@ -117,8 +108,11 @@ void json_metadata(FILE *file)
 
 	json_object_object_add(obj, "syslog",
 			       json_object_new_int(zconf.syslog));
-	json_object_object_add(obj, "default_mode",
-			       json_object_new_int(zconf.default_mode));
+	json_object_object_add(obj, "filter_duplicates",
+			       json_object_new_int(zconf.filter_duplicates));
+	json_object_object_add(obj, "filter_unsuccessful",
+			       json_object_new_int(zconf.filter_unsuccessful));
+
 	json_object_object_add(obj, "pcap_recv",
 			       json_object_new_int(zrecv.pcap_recv));
 	json_object_object_add(obj, "pcap_drop",
@@ -128,27 +122,25 @@ void json_metadata(FILE *file)
 
 	json_object_object_add(obj, "ip_fragments",
 			       json_object_new_int(zrecv.ip_fragments));
-	json_object_object_add(obj, "blocklist_total_allowed",
+	json_object_object_add(obj, "blacklist_total_allowed",
 			       json_object_new_int64(zconf.total_allowed));
-	json_object_object_add(obj, "blocklist_total_not_allowed",
+	json_object_object_add(obj, "blacklist_total_not_allowed",
 			       json_object_new_int64(zconf.total_disallowed));
 	json_object_object_add(obj, "validation_passed",
 			       json_object_new_int(zrecv.validation_passed));
 	json_object_object_add(obj, "validation_failed",
 			       json_object_new_int(zrecv.validation_failed));
 
-	//	json_object_object_add(obj, "blocklisted",
-	//            json_object_new_int64(zsend.blocklisted));
-	//	json_object_object_add(obj, "allowlisted",
-	//            json_object_new_int64(zsend.allowlisted));
+	//	json_object_object_add(obj, "blacklisted",
+	//            json_object_new_int64(zsend.blacklisted));
+	//	json_object_object_add(obj, "whitelisted",
+	//            json_object_new_int64(zsend.whitelisted));
 	json_object_object_add(obj, "first_scanned",
 			       json_object_new_int64(zsend.first_scanned));
 	json_object_object_add(obj, "send_to_failures",
 			       json_object_new_int64(zsend.sendto_failures));
-	json_object_object_add(obj, "packets_sent",
-			       json_object_new_int64(zsend.packets_sent));
-	json_object_object_add(obj, "targets_scanned",
-			       json_object_new_int64(zsend.targets_scanned));
+	json_object_object_add(obj, "total_sent",
+			       json_object_new_int64(zsend.sent));
 	json_object_object_add(obj, "success_total",
 			       json_object_new_int64(zrecv.success_total));
 	json_object_object_add(obj, "success_unique",
@@ -219,8 +211,9 @@ void json_metadata(FILE *file)
 		    json_object_new_string(zconf.probe_args));
 	}
 	if (zconf.probe_ttl) {
-		json_object_object_add(obj, "probe_ttl",
-				       json_object_new_int(zconf.probe_ttl));
+		json_object_object_add(
+		    obj, "probe_ttl",
+		    json_object_new_int(zconf.probe_ttl));
 	}
 	if (zconf.output_args) {
 		json_object_object_add(
@@ -277,15 +270,15 @@ void json_metadata(FILE *file)
 		    obj, "output_filename",
 		    json_object_new_string(zconf.output_filename));
 	}
-	if (zconf.blocklist_filename) {
+	if (zconf.blacklist_filename) {
 		json_object_object_add(
-		    obj, "blocklist_filename",
-		    json_object_new_string(zconf.blocklist_filename));
+		    obj, "blacklist_filename",
+		    json_object_new_string(zconf.blacklist_filename));
 	}
-	if (zconf.allowlist_filename) {
+	if (zconf.whitelist_filename) {
 		json_object_object_add(
-		    obj, "allowlist_filename",
-		    json_object_new_string(zconf.allowlist_filename));
+		    obj, "whitelist_filename",
+		    json_object_new_string(zconf.whitelist_filename));
 	}
 	if (zconf.list_of_ips_filename) {
 		json_object_object_add(
@@ -294,21 +287,14 @@ void json_metadata(FILE *file)
 		json_object_object_add(
 		    obj, "list_of_ips_count",
 		    json_object_new_int(zconf.list_of_ips_count));
+		json_object_object_add(obj, "list_of_ips_tried_sent",
+				       json_object_new_int(zsend.tried_sent));
 	}
 	json_object_object_add(obj, "dryrun",
 			       json_object_new_int(zconf.dryrun));
 	json_object_object_add(obj, "quiet", json_object_new_int(zconf.quiet));
 	json_object_object_add(obj, "log_level",
 			       json_object_new_int(zconf.log_level));
-
-	json_object_object_add(
-	    obj, "deduplication_method",
-	    json_object_new_string(DEDUP_METHOD_NAMES[zconf.dedup_method]));
-	if (zconf.dedup_method == DEDUP_METHOD_WINDOW) {
-		json_object_object_add(
-		    obj, "deduplication_window_size",
-		    json_object_new_int(zconf.dedup_window_size));
-	}
 
 	// parse out JSON metadata that was supplied on the command-line
 	if (zconf.custom_metadata_str) {
@@ -327,35 +313,35 @@ void json_metadata(FILE *file)
 				       json_object_new_string(zconf.notes));
 	}
 
-	// add blocklisted and allowlisted CIDR blocks
-	bl_cidr_node_t *b = get_blocklisted_cidrs();
+	// add blacklisted and whitelisted CIDR blocks
+	bl_cidr_node_t *b = get_blacklisted_cidrs();
 	if (b) {
-		json_object *blocklisted_cidrs = json_object_new_array();
+		json_object *blacklisted_cidrs = json_object_new_array();
 		do {
 			char cidr[50];
 			struct in_addr addr;
 			addr.s_addr = b->ip_address;
 			sprintf(cidr, "%s/%i", inet_ntoa(addr), b->prefix_len);
-			json_object_array_add(blocklisted_cidrs,
+			json_object_array_add(blacklisted_cidrs,
 					      json_object_new_string(cidr));
 		} while (b && (b = b->next));
-		json_object_object_add(obj, "blocklisted_networks",
-				       blocklisted_cidrs);
+		json_object_object_add(obj, "blacklisted_networks",
+				       blacklisted_cidrs);
 	}
 
-	b = get_allowlisted_cidrs();
+	b = get_whitelisted_cidrs();
 	if (b) {
-		json_object *allowlisted_cidrs = json_object_new_array();
+		json_object *whitelisted_cidrs = json_object_new_array();
 		do {
 			char cidr[50];
 			struct in_addr addr;
 			addr.s_addr = b->ip_address;
 			sprintf(cidr, "%s/%i", inet_ntoa(addr), b->prefix_len);
-			json_object_array_add(allowlisted_cidrs,
+			json_object_array_add(whitelisted_cidrs,
 					      json_object_new_string(cidr));
 		} while (b && (b = b->next));
-		json_object_object_add(obj, "allowlisted_networks",
-				       allowlisted_cidrs);
+		json_object_object_add(obj, "whitelisted_networks",
+				       whitelisted_cidrs);
 	}
 
 	fprintf(file, "%s\n", json_object_to_json_string(obj));

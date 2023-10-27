@@ -25,12 +25,12 @@
 #define IP_LEN sizeof(struct ip)
 
 probe_module_t module_tcp_forbiddenscan;
-static uint32_t num_source_ports;
+static uint32_t num_ports;
 
 static int forbiddenscan_global_initialize(struct state_conf *state)
 {
     printf("Starting module. Packet out size: %d\n", TOTAL_LEN_PAYLOAD + TOTAL_LEN);
-	num_source_ports = state->source_port_last - state->source_port_first + 1;
+	num_ports = state->source_port_last - state->source_port_first + 1;
 	return EXIT_SUCCESS;
 }
 
@@ -44,7 +44,7 @@ static int forbiddenscan_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw
 	uint16_t len = htons(sizeof(struct ip) + sizeof(struct tcphdr));
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
-	make_tcp_header(tcp_header, TH_SYN);
+	make_tcp_header(tcp_header, dst_port, TH_SYN);
 	return EXIT_SUCCESS;
 }
 static int forbiddenscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *gw,
@@ -57,122 +57,114 @@ static int forbiddenscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *g
 	uint16_t len = htons(sizeof(struct ip) + sizeof(struct tcphdr) + PAYLOAD_LEN);
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
-	make_tcp_header(tcp_header, TCP_FLAGS);
-	
+	make_tcp_header(tcp_header, dst_port, TCP_FLAGS);
 	char *payload = (char *)(&tcp_header[1]);
 	memcpy(payload, PAYLOAD, PAYLOAD_LEN);
 	return EXIT_SUCCESS;
 }
 
-static int forbiddenscan_make_packet(void *buf, size_t *buf_len, ipaddr_n_t src_ip,
-			       ipaddr_n_t dst_ip, port_n_t dport, uint8_t ttl,
-			       uint32_t *validation, int probe_num,
-			       UNUSED void *arg)
+static int forbiddenscan_make_packet(void *buf, UNUSED size_t *buf_len,
+        ipaddr_n_t src_ip, ipaddr_n_t dst_ip, uint8_t ttl,
+        uint32_t *validation, int probe_num,
+        UNUSED void *arg)
 {
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
+    // Subtract one for the SYN packet
 	uint32_t tcp_seq = ntohl(htonl(validation[0]) - 1);
+	uint32_t tcp_ack = 0;
+	    //validation[2]; // get_src_port() below uses validation 1 internally.
 
 	ip_header->ip_src.s_addr = src_ip;
 	ip_header->ip_dst.s_addr = dst_ip;
 	ip_header->ip_ttl = ttl;
 
-	port_h_t sport = get_src_port(num_source_ports, probe_num, validation);
-	tcp_header->th_sport = htons(sport);
-	tcp_header->th_dport = dport;
+	tcp_header->th_sport =
+	    htons(get_src_port(num_ports, probe_num, validation));
 	tcp_header->th_seq = tcp_seq;
-	tcp_header->th_ack = 0;
-	// checksum value must be zero when calculating packet's checksum
+	tcp_header->th_ack = tcp_ack;
 	tcp_header->th_sum = 0;
-	tcp_header->th_sum = tcp_checksum(sizeof(struct tcphdr), 
-						ip_header->ip_src.s_addr,
-						ip_header->ip_dst.s_addr, tcp_header);
-	// checksum value must be zero when calculating packet's checksum
+	tcp_header->th_sum =
+	    tcp_checksum(sizeof(struct tcphdr), ip_header->ip_src.s_addr,
+			 ip_header->ip_dst.s_addr, tcp_header);
+
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
-	*buf_len = ETHER_LEN + TOTAL_LEN;
 	return EXIT_SUCCESS;
 }
-static int forbiddenscan_make_packet2(void *buf, size_t *buf_len, ipaddr_n_t src_ip,
-			       ipaddr_n_t dst_ip, port_n_t dport, uint8_t ttl,
-			       uint32_t *validation, int probe_num,
-			       UNUSED void *arg)
+static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
+				  ipaddr_n_t src_ip, ipaddr_n_t dst_ip, uint8_t ttl,
+				  uint32_t *validation, int probe_num,
+				  UNUSED void *arg)
 {
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
 	uint32_t tcp_seq = validation[0];
-	uint32_t tcp_ack = validation[2]; // get_src_port() below uses validation 1 internally.
+	uint32_t tcp_ack =
+	    validation[2]; // get_src_port() below uses validation 1 internally.
 
 	ip_header->ip_src.s_addr = src_ip;
 	ip_header->ip_dst.s_addr = dst_ip;
 	ip_header->ip_ttl = ttl;
 
-	port_h_t sport = get_src_port(num_source_ports, probe_num, validation);
-	tcp_header->th_sport = htons(sport);
-	tcp_header->th_dport = dport;
+	tcp_header->th_sport =
+	    htons(get_src_port(num_ports, probe_num, validation));
 	tcp_header->th_seq = tcp_seq;
 	tcp_header->th_ack = tcp_ack;
-	// checksum value must be zero when calculating packet's checksum
 	tcp_header->th_sum = 0;
-	tcp_header->th_sum = tcp_checksum(sizeof(struct tcphdr) + PAYLOAD_LEN, 
-						ip_header->ip_src.s_addr,
-						ip_header->ip_dst.s_addr, tcp_header);
-	// checksum value must be zero when calculating packet's checksum
+	tcp_header->th_sum =
+	    tcp_checksum(sizeof(struct tcphdr) + PAYLOAD_LEN, ip_header->ip_src.s_addr,
+			 ip_header->ip_dst.s_addr, tcp_header);
+
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
-	*buf_len = ETHER_LEN + TOTAL_LEN_PAYLOAD;
 	return EXIT_SUCCESS;
 }
 
 static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
-				      UNUSED uint32_t *src_ip,
-				      uint32_t *validation,
-				      const struct port_conf *ports)
+        __attribute__((unused)) uint32_t *src_ip,
+        uint32_t *validation)
 {
 	if (ip_hdr->ip_p != IPPROTO_TCP) {
-		return PACKET_INVALID;
+		return 0;
 	}
-	
-	struct tcphdr *tcp = get_tcp_header(ip_hdr, len);
-	if (!tcp) {
-		return PACKET_INVALID;
+	if ((4 * ip_hdr->ip_hl + sizeof(struct tcphdr)) + 1 > len) {
+		// buffer not large enough to contain expected tcp header 
+		return 0;
 	}
-	
+
+	struct tcphdr *tcp = (struct tcphdr *)((char *)ip_hdr + 4 * ip_hdr->ip_hl);
 	uint16_t sport = tcp->th_sport;
 	uint16_t dport = tcp->th_dport;
-	// validate source port
-	if (!check_src_port(sport, ports)) {
-		return PACKET_INVALID;
+
+    // validate source port
+	if (ntohs(sport) != zconf.target_port) {
+		return 0;
 	}
 
 	// validate destination port
-	/*if (!check_dst_port(ntohs(dport), num_source_ports, validation)) {
-		return PACKET_INVALID;
-	}*/
+	if (!check_dst_port(ntohs(dport), num_ports, validation)) {
+		return 0;
+	}
     
-    /*int payloadlen = ntohs(ip_hdr->ip_len) - IP_LEN - (tcp->th_off * 4);
-    
-    if (payloadlen = 0) {
-      return PACKET_INVALID;
-    }*/
-    
-    /*if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN) &&  
+    if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN)/* &&  
         (htonl(tcp->th_ack) != htonl(validation[0])) &&
-        (htonl(tcp->th_seq) != htonl(validation[2]))) {
-        return PACKET_INVALID;
-    }*/
-    
-	return PACKET_VALID;
+        (htonl(tcp->th_seq) != htonl(validation[2]))*/) {
+        return 0;
+    }
+
+	return 1;
 }
 
-static void forbiddenscan_process_packet(const u_char *packet, UNUSED uint32_t len,
-				      fieldset_t *fs,
-				      UNUSED uint32_t *validation,
-				      UNUSED struct timespec ts)
+static void forbiddenscan_process_packet(const u_char *packet,
+        uint32_t len,
+        fieldset_t *fs,
+        __attribute__((unused))
+        uint32_t *validation)
 {
 	struct ip *ip_hdr = (struct ip *)&packet[sizeof(struct ether_header)];
 	struct tcphdr *tcp =
@@ -181,6 +173,7 @@ static void forbiddenscan_process_packet(const u_char *packet, UNUSED uint32_t l
     int mylen = ntohs(ip_hdr->ip_len);
     int payloadlen = mylen - IP_LEN - (tcp->th_off * 4);
     mylen += ETHER_LEN;
+
 
 	fs_add_uint64(fs, "sport", (uint64_t)ntohs(tcp->th_sport));
 	fs_add_uint64(fs, "dport", (uint64_t)ntohs(tcp->th_dport));
@@ -219,13 +212,17 @@ static fielddef_t myfields[] = {
     {.name = "flags", .type = "int", .desc = "Packet flags"},
     {.name = "ipid", .type = "int", .desc = "IP Identification"},
     {.name = "validation_type", .type = "int", .desc = "Type of Validation"},
-    {.name = "classification", .type = "string", .desc = "packet classification"},
-    {.name = "success", .type = "bool", .desc = "is response considered success"}};
+    {.name = "classification",
+        .type = "string",
+        .desc = "packet classification"},
+    {.name = "success",
+        .type = "bool",
+        .desc = "is response considered success"}};
 
 probe_module_t module_forbidden_scan = {
     .name = "forbidden_scan",
-    .max_packet_length = ETHER_LEN + TOTAL_LEN,
-    .max_packet2_length = ETHER_LEN + TOTAL_LEN_PAYLOAD,
+    .packet_length = TOTAL_LEN + ETHER_LEN,
+    .packet2_length = TOTAL_LEN_PAYLOAD + ETHER_LEN,
     .pcap_filter = "tcp", 
     .pcap_snaplen = 96,
     .port_args = 1,
@@ -244,4 +241,4 @@ probe_module_t module_forbidden_scan = {
         "is considered a success.",
     .output_type = OUTPUT_TYPE_STATIC,
     .fields = myfields,
-    .numfields = sizeof(myfields) / sizeof(myfields[0])};
+    .numfields = 12};

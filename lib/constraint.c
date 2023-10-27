@@ -1,19 +1,3 @@
-/*
- * Copyright 2021 Regents of the University of Michigan
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -37,7 +21,7 @@
 // values are applied by setting them for network prefixes.  Order
 // matters: setting a value replaces any existing value for that
 // prefix or subsets of it.  We use this to implement network
-// allowlisting and blocklisting.
+// whitelisting and blacklisting.
 //
 // Think of setting values in this structure like painting
 // subnets with different colors.  We can paint subnets black to
@@ -75,11 +59,11 @@ typedef struct node {
 #define RADIX_LENGTH 20
 
 struct _constraint {
-	node_t *root;	  // root node of the tree
+	node_t *root;     // root node of the tree
 	uint32_t *radix;  // array of prefixes (/RADIX_LENGTH) that are painted
 			  // paint_value
 	size_t radix_len; // number of prefixes in radix array
-	int painted;	  // have we precomputed counts for each node?
+	int painted;      // have we precomputed counts for each node?
 	value_t paint_value; // value for which we precomputed counts
 };
 
@@ -258,7 +242,7 @@ uint32_t constraint_lookup_index(constraint_t *con, uint64_t index,
 // the number of addresses in a prefix at the current level of the tree.
 // If paint is specified, each node will have its count set to the number of
 // leaves under it set to value.
-// If exclude_radix is specified, the number of addresses will exclude prefixes
+// If exclude_radix is specified, the number of addresses will exlcude prefixes
 // that are a /RADIX_LENGTH or larger
 static uint64_t _count_ips_recurse(node_t *node, value_t value, uint64_t size,
 				   int paint, int exclude_radix)

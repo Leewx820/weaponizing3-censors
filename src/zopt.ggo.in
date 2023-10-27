@@ -10,36 +10,31 @@ package "zmap"
 version "@ZMAP_VERSION@"
 purpose "A fast Internet-wide scanner."
 
-section "Basic Arguments"
+section "Basic arguments"
 
-option "target-ports"           p "comma-delimited list of ports and port ranges to scan (for TCP and UDP scans)"
-    typestr="ports"
-    optional string
+option "target-port"            p "port number to scan (for TCP and UDP scans)"
+    typestr="port"
+    optional int
 option "output-file"            o "Output file"
     typestr="name"
     optional string
-option "blocklist-file"         b "File of subnets to exclude, in CIDR notation, e.g. 192.168.0.0/16"
+option "blacklist-file"         b "File of subnets to exclude, in CIDR notation, e.g. 192.168.0.0/16"
     typestr="path"
     optional string
-option "allowlist-file"         w "File of subnets to constrain scan to, in CIDR notation, e.g. 192.168.0.0/16"
+option "whitelist-file"         w "File of subnets to constrain scan to, in CIDR notation, e.g. 192.168.0.0/16"
     typestr="path"
     optional string
-option "list-of-ips-file"       I "List of individual addresses to scan in random order. Use --white-list file unless >1 million IPs"
+option "list-of-ips-file"		I "List of individual addresses to scan in random order. Use --white-list file unless >1 million IPs"
     typestr="path"
     optional string
 
-
-section "Scan Options"
-
+section "Scan options"
 option "rate"                   r "Set send rate in packets/sec"
     typestr="pps"
     optional int
 option "bandwidth"              B "Set send rate in bits/second (supports suffixes G, M and K)"
     typestr="bps"
     optional string
-option "batch"                  - "Set the number of packets to send per iteration"
-    typestr="pps"
-    optional int
 option "max-targets"            n "Cap number of targets to probe (as a number or a percentage of the address space)"
     typestr="n"
     optional string
@@ -66,10 +61,6 @@ option "retries"                - "Max number of times to try to send packet if 
     optional int
 option "dryrun"                 d "Don't actually send packets"
     optional
-
-
-section "Scan Sharding"
-
 option "shards"                 - "Set the total number of shards"
     typestr="N"
     optional int
@@ -79,7 +70,7 @@ option "shard"                  - "Set which shard this scan is (0 indexed)"
     optional int
     default="0"
 
-section "Network Options"
+section "Network options"
 
 option "source-port"            s "Source port(s) for scan packets"
     typestr="port|range"
@@ -104,22 +95,26 @@ option "probe-module"           M "Select probe module"
     typestr="name"
     default="tcp_synscan"
     optional string
+
 option "probe-args"             - "Arguments to pass to probe module"
     typestr="args"
     optional string
+
 option "probe-ttl"              - "Set TTL value for probe IP packets"
     typestr="n"
     default="255"
     optional int
+
 option "list-probe-modules"     - "List available probe modules"
         optional
 
-section "Results Output"
+section "Data Output"
 option "output-fields"          f "Fields that should be output in result set"
     typestr="fields"
     optional string
 option "output-module"          O "Select output module"
     typestr="name"
+    default="default"
     optional string
 option "output-args"            - "Arguments to pass to output module"
     typestr="args"
@@ -131,18 +126,6 @@ option "list-output-modules"    - "List available output modules"
         optional
 option "list-output-fields"     - "List all fields that can be output by selected probe module"
     optional
-option "no-header-row"          - "Precludes outputting any header rows in data (e.g., CSV headers)"
-    optional
-
-
-section "Response Deduplication"
-option "dedup-method"           - "Specifices how response deduplication should be performed. Options: default, none, full, window"
-    typestr="method"
-    optional string
-option "dedup-window-size"      - "Specifices window size for how many recent responses to keep in memory for deuplication"
-    typestr="targets"
-    default="1000000"
-    optional int
 
 section "Logging and Metadata"
 option "verbosity"              v "Level of log detail (0-5)"
@@ -172,7 +155,7 @@ option "user-metadata"          - "Inject user-specified JSON metadata into scan
     typestr="json"
     optional string
 
-section "Additional Options"
+section "Additional options"
 option "config"                 C "Read a configuration file, which can specify any of these options"
     typestr="filename"
     default="/etc/zmap/zmap.conf"
@@ -195,7 +178,9 @@ option "sender-threads"         T "Threads used to send packets"
 
 option "cores"                  - "Comma-separated list of cores to pin to"
     optional string
-option "ignore-blocklist-errors" - "Ignore invalid entries in allowlist/blocklist file."
+option "ignore-invalid-hosts"   - "Deprecated; use --ignore-blacklist-errors instead"
+    optional
+option "ignore-blacklist-errors" - "Ignore invalid entries in whitelist/blacklist file. Equivalent to --ignore-invalid-hosts"
     optional
 option "help"                   h "Print help and exit"
     optional
@@ -203,8 +188,7 @@ option "version"                V "Print version and exit"
     optional
 
 text "\nExamples:\n\
-    zmap -p 80 (scan full IPv4 address space for hosts on TCP/80)\n\
+    zmap -p 80 (scan the Internet for hosts on tcp/80 and output to stdout)\n\
     zmap -N 5 -B 10M -p 80 (find 5 HTTP servers, scanning at 10 Mb/s)\n\
-    zmap -p 80 10.0.0.0/8 192.168.0.0/16 (scan both subnets on TCP/80)\n\
-    zmap -p 80 1.2.3.4 10.0.0.3 (scan 1.2.3.4, 10.0.0.3 on TCP/80)\n\
-    zmap -p 80,100-102 (scan full IPv4 on ports 80, 100, 101, 102)"
+    zmap -p 80 10.0.0.0/8 192.168.0.0/16 -o (scan both subnets on tcp/80)\n\
+    zmap -p 80 1.2.3.4 10.0.0.3 (scan 1.2.3.4, 10.0.0.3 on tcp/80)"

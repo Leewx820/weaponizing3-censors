@@ -30,17 +30,16 @@ static const char *upnp_query = "M-SEARCH * HTTP/1.1\r\n"
 
 probe_module_t module_upnp;
 
-static int num_ports;
-
 int upnp_global_initialize(struct state_conf *state)
 {
-	num_ports = state->source_port_last - state->source_port_first + 1;
+	int num_ports = state->source_port_last - state->source_port_first + 1;
 	udp_set_num_ports(num_ports);
 	return EXIT_SUCCESS;
 }
 
 int upnp_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw,
-			UNUSED void **arg_ptr)
+			port_h_t dst_port,
+			__attribute__((unused)) void **arg_ptr)
 {
 	memset(buf, 0, MAX_PACKET_SIZE);
 	struct ether_header *eth_header = (struct ether_header *)buf;
@@ -53,7 +52,7 @@ int upnp_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw,
 
 	struct udphdr *udp_header = (struct udphdr *)(&ip_header[1]);
 	len = sizeof(struct udphdr) + strlen(upnp_query);
-	make_udp_header(udp_header, len);
+	make_udp_header(udp_header, dst_port, len);
 
 	char *payload = (char *)(&udp_header[1]);
 
@@ -69,16 +68,30 @@ int upnp_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw,
 }
 
 int upnp_validate_packet(const struct ip *ip_hdr, uint32_t len,
-			 uint32_t *src_ip, uint32_t *validation,
-			 const struct port_conf *ports)
+			 uint32_t *src_ip, uint32_t *validation)
 {
-	return udp_do_validate_packet(ip_hdr, len, src_ip, validation,
-				      num_ports, SRC_PORT_VALIDATION, ports);
+	if (!udp_validate_packet(ip_hdr, len, src_ip, validation)) {
+		return 0;
+	}
+	if (ip_hdr->ip_p == IPPROTO_UDP) {
+		struct udphdr *udp =
+		    (struct udphdr *)((char *)ip_hdr + ip_hdr->ip_hl * 4);
+		uint16_t sport = ntohs(udp->uh_sport);
+		if (sport != zconf.target_port) {
+			return 0;
+		}
+		size_t expected_length =
+		    4 * ip_hdr->ip_hl + ntohs(udp->uh_ulen);
+		if (expected_length > len) {
+			return 0;
+		}
+	}
+	return 1;
 }
 
-void upnp_process_packet(const u_char *packet, UNUSED uint32_t len,
-			 fieldset_t *fs, UNUSED uint32_t *validation,
-			 UNUSED struct timespec ts)
+void upnp_process_packet(const u_char *packet,
+			 __attribute__((unused)) uint32_t len, fieldset_t *fs,
+			 __attribute__((unused)) uint32_t *validation)
 {
 	struct ip *ip_hdr = (struct ip *)&packet[sizeof(struct ether_header)];
 	if (ip_hdr->ip_p == IPPROTO_UDP) {
@@ -184,8 +197,14 @@ void upnp_process_packet(const u_char *packet, UNUSED uint32_t len,
 			      (void *)&udp[1], 0);
 
 		free(s);
+#if 0
 	} else if (ip_hdr->ip_p == IPPROTO_ICMP) {
-		fs_add_constchar(fs, "classification", "icmp");
+		struct icmp *icmp = (struct icmp *) ((char *) ip_hdr + ip_hdr->ip_hl * 4);
+		struct ip *ip_inner = (struct ip *) ((char *) icmp + ICMP_UNREACH_HEADER_SIZE);
+		// ICMP unreach comes from another server (not the one we sent a probe to);
+		// But we will fix up saddr to be who we sent the probe to, in case you care.
+		fs_modify_string(fs, "saddr", make_ip_str(ip_inner->ip_dst.s_addr), 1);
+		fs_add_string(fs, "classification", (char*) "icmp-unreach", 0);
 		fs_add_uint64(fs, "success", 0);
 
 		fs_add_null(fs, "server");
@@ -200,11 +219,18 @@ void upnp_process_packet(const u_char *packet, UNUSED uint32_t len,
 
 		fs_add_null(fs, "sport");
 		fs_add_null(fs, "dport");
-
-		fs_populate_icmp_from_iphdr(ip_hdr, len, fs);
+		fs_add_string(fs, "icmp_responder", make_ip_str(ip_hdr->ip_src.s_addr), 1);
+		fs_add_uint64(fs, "icmp_type", icmp->icmp_type);
+		fs_add_uint64(fs, "icmp_code", icmp->icmp_code);
+		if (icmp->icmp_code <= ICMP_UNREACH_PRECEDENCE_CUTOFF) {
+			fs_add_string(fs, "icmp_unreach_str", (char *) udp_unreach_strings[icmp->icmp_code], 0);
+		} else {
+			fs_add_string(fs, "icmp_unreach_str", (char *) "unknown", 0);
+		}
 		fs_add_null(fs, "data");
+#endif
 	} else {
-		fs_add_constchar(fs, "classification", "other");
+		fs_add_string(fs, "classification", (char *)"other", 0);
 		fs_add_bool(fs, "success", 0);
 		fs_add_null(fs, "server");
 		fs_add_null(fs, "location");
@@ -245,12 +271,21 @@ static fielddef_t fields[] = {
 
     {.name = "sport", .type = "int", .desc = "UDP source port"},
     {.name = "dport", .type = "int", .desc = "UDP destination port"},
-    ICMP_FIELDSET_FIELDS,
+    {.name = "icmp_responder",
+     .type = "string",
+     .desc = "Source IP of ICMP_UNREACH message"},
+    {.name = "icmp_type", .type = "int", .desc = "icmp message type"},
+    {.name = "icmp_code", .type = "int", .desc = "icmp message sub type code"},
+    {.name = "icmp_unreach_str",
+     .type = "string",
+     .desc =
+	 "for icmp_unreach responses, the string version of icmp_code (e.g. network-unreach)"},
+
     {.name = "data", .type = "binary", .desc = "UDP payload"}};
 
 probe_module_t module_upnp = {
     .name = "upnp",
-    .max_packet_length = 139,
+    .packet_length = 139,
     .pcap_filter = "udp || icmp",
     .pcap_snaplen = 2048,
     .port_args = 1,

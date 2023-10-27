@@ -11,10 +11,10 @@
 #include <assert.h>
 #include <string.h>
 
-#include "../lib/logger.h"
-#include "../lib/rijndael-alg-fst.h"
-#include "../lib/random.h"
-#include "../lib/xalloc.h"
+#include "rijndael-alg-fst.h"
+#include "random.h"
+#include "logger.h"
+#include "xalloc.h"
 
 #include "aesrand.h"
 
@@ -51,7 +51,7 @@ aesrand_t *aesrand_init_from_seed(uint64_t seed)
 	return _aesrand_init(key);
 }
 
-aesrand_t *aesrand_init_from_random(void)
+aesrand_t *aesrand_init_from_random()
 {
 	uint8_t key[AES_KEY_BYTES];
 	if (!random_bytes(key, AES_KEY_BYTES)) {

@@ -1,3 +1,4 @@
+.*
 !.clang-format
 *.o
 *.a
@@ -17,7 +18,7 @@ src/topt.h
 src/ztopt.c
 src/ztopt.h
 src/*.ggo
-src/zblocklist
+src/zblacklist
 src/ztee
 src/ziterate
 lexer.c

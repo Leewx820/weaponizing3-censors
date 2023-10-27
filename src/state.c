@@ -9,20 +9,18 @@
 #include "state.h"
 #include "../lib/logger.h"
 
-const char *const DEDUP_METHOD_NAMES[] = {"default", "none", "full", "window"};
-
 // global configuration and defaults
 struct state_conf zconf = {.log_level = LOG_INFO,
 			   .source_port_first = 32768, // (these are the default
 			   .source_port_last =
-			       61000, //   ephemeral range on Linux)
+			       61000, //	 ephemeral range on Linux)
 			   .output_filename = NULL,
-			   .blocklist_filename = NULL,
-			   .allowlist_filename = NULL,
+			   .blacklist_filename = NULL,
+			   .whitelist_filename = NULL,
 			   .list_of_ips_filename = NULL,
 			   .list_of_ips_count = 0,
-			   .ports = NULL,
-			   .max_targets = UINT64_MAX,
+			   .target_port = 0,
+			   .max_targets = 0xFFFFFFFF,
 			   .max_runtime = 0,
 			   .max_results = 0,
 			   .iface = NULL,
@@ -30,7 +28,6 @@ struct state_conf zconf = {.log_level = LOG_INFO,
 			   .bandwidth = 0,
 			   .cooldown_secs = 0,
 			   .senders = 1,
-			   .batch = 1,
 			   .packet_streams = 1,
 			   .seed_provided = 0,
 			   .seed = 0,
@@ -44,6 +41,7 @@ struct state_conf zconf = {.log_level = LOG_INFO,
 			   .hw_mac = {0},
 			   .gw_mac_set = 0,
 			   .hw_mac_set = 0,
+			   .source_ip_addresses = NULL,
 			   .number_source_ips = 0,
 			   .send_ip_pkts = 0,
 			   .raw_output_fields = NULL,
@@ -56,6 +54,8 @@ struct state_conf zconf = {.log_level = LOG_INFO,
 			   .dryrun = 0,
 			   .quiet = 0,
 			   .syslog = 1,
+			   .filter_duplicates = 0,
+			   .filter_unsuccessful = 0,
 			   .max_sendto_failures = -1,
 			   .min_hitrate = 0.0,
 			   .metadata_file = NULL,
@@ -63,23 +63,16 @@ struct state_conf zconf = {.log_level = LOG_INFO,
 			   .notes = NULL,
 			   .custom_metadata_str = NULL,
 			   .recv_ready = 0,
-			   .data_link_size = 0,
-			   .default_mode = 0,
-			   .no_header_row = 0,
-			   .dedup_method = 0,
-			   .dedup_window_size = 0};
-
-void init_empty_global_configuration(struct state_conf *c)
-{
-	memset(c->source_ip_addresses, 0, sizeof(c->source_ip_addresses));
-}
+			   .data_link_size = 0};
 
 // global sender stats and defaults
 struct state_send zsend = {
     .start = 0.0,
     .finish = 0.0,
-    .packets_sent = 0,
-    .targets_scanned = 0,
+    .sent = 0,
+    .tried_sent = 0,
+    .blacklisted = 0,
+    .whitelisted = 0,
     .warmup = 1,
     .complete = 0,
     .sendto_failures = 0,
