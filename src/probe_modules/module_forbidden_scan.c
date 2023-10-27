@@ -47,7 +47,7 @@ static int forbiddenscan_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
 
-	make_tcp_header(tcp_header, dst_port, TH_SYN);
+	make_tcp_header(tcp_header, TH_SYN);
 	return EXIT_SUCCESS;
 }
 static int forbiddenscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *gw,
@@ -62,16 +62,17 @@ static int forbiddenscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *g
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
 
-	make_tcp_header(tcp_header, dst_port, TCP_FLAGS);
+	make_tcp_header(tcp_header, TCP_FLAGS);
 	char *payload = (char *)(&tcp_header[1]);
 	memcpy(payload, PAYLOAD, PAYLOAD_LEN);
 	return EXIT_SUCCESS;
 }
 
 static int forbiddenscan_make_packet(void *buf, UNUSED size_t *buf_len,
-        ipaddr_n_t src_ip, ipaddr_n_t dst_ip, uint8_t ttl,
-        uint32_t *validation, int probe_num,
-        UNUSED void *arg)
+				  ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
+				  port_n_t dport, uint8_t ttl,
+				  uint32_t *validation, int probe_num,
+				  UNUSED void *arg)
 {
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
@@ -87,6 +88,7 @@ static int forbiddenscan_make_packet(void *buf, UNUSED size_t *buf_len,
 
 	tcp_header->th_sport =
 	    htons(get_src_port(num_ports, probe_num, validation));
+	tcp_header->th_dport = dport;
 	tcp_header->th_seq = tcp_seq;
 	tcp_header->th_ack = tcp_ack;
 	tcp_header->th_sum = 0;
@@ -101,7 +103,8 @@ static int forbiddenscan_make_packet(void *buf, UNUSED size_t *buf_len,
 	return EXIT_SUCCESS;
 }
 static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
-				  ipaddr_n_t src_ip, ipaddr_n_t dst_ip, uint8_t ttl,
+				  ipaddr_n_t src_ip, ipaddr_n_t dst_ip,
+				  port_n_t dport, uint8_t ttl,
 				  uint32_t *validation, int probe_num,
 				  UNUSED void *arg)
 {
@@ -118,6 +121,7 @@ static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 
 	tcp_header->th_sport =
 	    htons(get_src_port(num_ports, probe_num, validation));
+	tcp_header->th_dport = dport;
 	tcp_header->th_seq = tcp_seq;
 	tcp_header->th_ack = tcp_ack;
 	tcp_header->th_sum = 0;
