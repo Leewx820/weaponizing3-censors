@@ -8,19 +8,17 @@ import sys
 
 # Coverage guided list of domains (not in order)
 hosts = [
-	'www.bloomberg.com',
-	'www.theepochtimes.com',
-    'anticommunism.miraheze.org',
-    'citizenpowerforchina.org',
-    'epochtimes.com',
+	'sex.com',
+	'bild.de',
+	't66y.com',
+	'tnaflix.com',
+    'youjizz.com',
     'falundafa.org',
-    'www.hrw.org',
-    'www.youporn.com',
-    'www.pornhub.com',
-    'www.bittorrent.com',
-    'www.roxypalace.com',
-    'plus.google.com',
-    'www.survive.org.uk'
+	'bloomberg.com',
+    'theepochtimes.com',
+    'epochtimes.com',
+    'hrw.org',
+    'citizenpowerforchina.org'
 ]
 
 if len(sys.argv) < 2:
