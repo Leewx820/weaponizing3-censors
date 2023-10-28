@@ -8,6 +8,8 @@ import sys
 
 # Coverage guided list of domains (not in order)
 hosts = [
+	'www.bloomberg.com',
+	'www.theepochtimes.com',
     'anticommunism.miraheze.org',
     'citizenpowerforchina.org',
     'epochtimes.com',
