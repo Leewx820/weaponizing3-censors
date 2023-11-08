@@ -116,7 +116,7 @@ static int notfoundscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 	int paylen = strlen(srcpayload);
 	memcpy(payload, srcpayload, paylen);
 
-	ip_header.ip_len += paylen;
+	ip_header->ip_len += paylen;
 
 	tcp_header->th_sport =
 	    htons(get_src_port(num_ports, probe_num, validation));
