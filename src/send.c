@@ -379,11 +379,13 @@ int send_run(sock_t st, shard_t *s)
 			uint32_t validation[VALIDATE_BYTES / sizeof(uint32_t)];
 			validate_gen(src_ip, current_ip, (uint8_t *)validation);
 			uint8_t ttl = zconf.probe_ttl;
-			size_t length = zconf.probe_module->packet_length;
+			size_t length;
+			//= zconf.probe_module->packet_length;
 			zconf.probe_module->make_packet(buf, &length, src_ip,
 							current_ip, ttl, validation,
 							i, probe_data);
-            size_t length2 = zconf.probe_module->packet2_length;
+			size_t length2;
+			//= zconf.probe_module->packet2_length;
 			zconf.probe_module->make_packet2(buf2, &length2, src_ip,
 							current_ip, ttl, validation,
 							i, probe_data);		
