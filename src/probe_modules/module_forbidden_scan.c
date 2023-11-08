@@ -92,6 +92,7 @@ static int forbiddenscan_make_packet(void *buf, UNUSED size_t *buf_len,
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
+	*buf_len = TOTAL_LEN + ETHER_LEN;
 	return EXIT_SUCCESS;
 }
 static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
@@ -122,6 +123,7 @@ static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
+	*buf_len = TOTAL_LEN_PAYLOAD + ETHER_LEN;
 	return EXIT_SUCCESS;
 }
 

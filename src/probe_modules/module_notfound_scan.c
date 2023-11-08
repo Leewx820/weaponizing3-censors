@@ -83,8 +83,7 @@ static int notfoundscan_make_packet(void *buf, UNUSED size_t *buf_len,
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
-	buf_len = TOTAL_LEN;
-
+	*buf_len = TOTAL_LEN;
 	return EXIT_SUCCESS;
 }
 static int notfoundscan_make_packet2(void *buf, UNUSED size_t *buf_len,
@@ -130,8 +129,7 @@ static int notfoundscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
-	buf_len = TOTAL_LEN + paylen;
-
+	*buf_len = TOTAL_LEN + paylen;
 	return EXIT_SUCCESS;
 }
 
