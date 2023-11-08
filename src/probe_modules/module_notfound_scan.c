@@ -51,8 +51,6 @@ static int notfoundscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *gw
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
 	make_tcp_header(tcp_header, dst_port, TCP_FLAGS);
-	//char *payload = (char *)(&tcp_header[1]);
-	//memcpy(payload, PAYLOAD, PAYLOAD_LEN);
 	return EXIT_SUCCESS;
 }
 
@@ -109,7 +107,7 @@ static int notfoundscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 
 	char dstip[16];
 	memset(dstip,0,sizeof(char) * 16);
-	strncpy(dstip, inet_ntoa(*ip_header->ip_dst), 15);
+	strncpy(dstip, inet_ntoa(ip_header->ip_dst), 15);
 	dstip[16] = '\0';
 
 	char srcpayload[64];
@@ -165,7 +163,7 @@ static int notfoundscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
 	    
 	char dstip[16];
 	memset(dstip,0,sizeof(char) * 16);
-	strncpy(dstip, inet_ntoa(*ip_hdr->ip_src), 15);
+	strncpy(dstip, inet_ntoa(ip_hdr->ip_src), 15);
 	dstip[16] = '\0';
 
 	char srcpayload[64];
@@ -205,7 +203,7 @@ static void notfoundscan_process_packet(const u_char *packet,
 
 	char dstip[16];
 	memset(dstip,0,sizeof(char) * 16);
-	strncpy(dstip, inet_ntoa(*ip_hdr->ip_src), 15);
+	strncpy(dstip, inet_ntoa(ip_hdr->ip_src), 15);
 	dstip[16] = '\0';
 
 	char srcpayload[64];
