@@ -14,6 +14,8 @@
 #include "module_tcp_synscan.h"
 
 #define TCP_FLAGS TH_PUSH | TH_ACK
+#define PAYLOAD "GET /a HTTP/1.1\r\nHost: localhost\r\n\r\n"
+#define PAYLOAD_LEN strlen(PAYLOAD) 
 #define TOTAL_LEN sizeof(struct ip) + sizeof(struct tcphdr)
 #define ETHER_LEN sizeof(struct ether_header)
 #define IP_LEN sizeof(struct ip)
@@ -47,10 +49,12 @@ static int notfoundscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *gw
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	make_eth_header(eth_header, src, gw);
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
-	uint16_t len = htons(sizeof(struct ip) + sizeof(struct tcphdr));
+	uint16_t len = htons(sizeof(struct ip) + sizeof(struct tcphdr) + PAYLOAD_LEN);
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
 	make_tcp_header(tcp_header, dst_port, TCP_FLAGS);
+	char *payload = (char *)(&tcp_header[1]);
+	memcpy(payload, PAYLOAD, PAYLOAD_LEN);
 	return EXIT_SUCCESS;
 }
 
@@ -104,32 +108,19 @@ static int notfoundscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 	ip_header->ip_dst.s_addr = dst_ip;
 	ip_header->ip_ttl = ttl;
 
-	char dstip[16];
-	memset(dstip,0,sizeof(char) * 16);
-	strncpy(dstip, inet_ntoa(ip_header->ip_dst), 15);
-	dstip[16] = '\0';
-
-	char srcpayload[64];
-	memset(srcpayload, 0, sizeof(char) * 64);
-	sprintf(srcpayload, "GET /a HTTP/1.1\r\nHost: %s\r\n\r\n", dstip);
-	int paylen = strlen(srcpayload);
-	memcpy(payload, srcpayload, paylen);
-
-	ip_header->ip_len = htons(TOTAL_LEN + paylen);
-
 	tcp_header->th_sport =
 	    htons(get_src_port(num_ports, probe_num, validation));
 	tcp_header->th_seq = tcp_seq;
 	tcp_header->th_ack = tcp_ack;
 	tcp_header->th_sum = 0;
-	tcp_header->th_sum = tcp_checksum(sizeof(struct tcphdr) + paylen,
+	tcp_header->th_sum = tcp_checksum(sizeof(struct tcphdr) + PAYLOAD_LEN,
 					  ip_header->ip_src.s_addr,
 					  ip_header->ip_dst.s_addr, tcp_header);
 
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
-	*buf_len = TOTAL_LEN + ETHER_LEN + paylen;
+	*buf_len = TOTAL_LEN + ETHER_LEN + PAYLOAD_LEN;
 	return EXIT_SUCCESS;
 }
 
@@ -159,17 +150,7 @@ static int notfoundscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
 		return 0;
 	}
 	    
-	char dstip[16];
-	memset(dstip,0,sizeof(char) * 16);
-	strncpy(dstip, inet_ntoa(ip_hdr->ip_src), 15);
-	dstip[16] = '\0';
-
-	char srcpayload[64];
-	memset(srcpayload, 0, sizeof(char) * 64);
-	sprintf(srcpayload, "GET /a HTTP/1.1\r\nHost: %s\r\n\r\n", dstip);
-	int paylen = strlen(srcpayload);
-
-    if ((htonl(tcp->th_ack) != htonl(validation[0]) + paylen) &&  
+    if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN) &&  
         (htonl(tcp->th_ack) != htonl(validation[0])) &&
         (htonl(tcp->th_seq) != htonl(validation[2]))) {
         return 0;
@@ -199,16 +180,6 @@ static void notfoundscan_process_packet(const u_char *packet,
     int payloadlen = mylen - IP_LEN - (tcp->th_off * 4);
     mylen += ETHER_LEN;
 
-	char dstip[16];
-	memset(dstip,0,sizeof(char) * 16);
-	strncpy(dstip, inet_ntoa(ip_hdr->ip_src), 15);
-	dstip[16] = '\0';
-
-	char srcpayload[64];
-	memset(srcpayload, 0, sizeof(char) * 64);
-	sprintf(srcpayload, "GET /a HTTP/1.1\r\nHost: %s\r\n\r\n", dstip);
-	int paylen = strlen(srcpayload);
-
 	fs_add_uint64(fs, "sport", (uint64_t)ntohs(tcp->th_sport));
 	fs_add_uint64(fs, "dport", (uint64_t)ntohs(tcp->th_dport));
 	fs_add_uint64(fs, "seqnum", (uint64_t)ntohl(tcp->th_seq));
@@ -221,7 +192,7 @@ static void notfoundscan_process_packet(const u_char *packet,
     // Attempt to track why an IP responded - did it acknolwedge our payload or not? 
     // If it acknowledges our payload, than it is probably responding to our payload
     // otherwise, it may just be sending us SYN/ACKs or responses
-    if (htonl(tcp->th_ack) == htonl(validation[0]) + paylen) {
+    if (htonl(tcp->th_ack) == htonl(validation[0]) + PAYLOAD_LEN) {
 	    fs_add_uint64(fs, "validation_type", 0);
     } else if ((htonl(tcp->th_ack) == htonl(validation[0])) ||
                (htonl(tcp->th_seq) == htonl(validation[2]))) {
