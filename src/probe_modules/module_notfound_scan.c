@@ -1,4 +1,4 @@
-// probe module for performing TCP forbidden payload scans
+// probe module for performing TCP notfound payload scans
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,28 +13,21 @@
 #include "packet.h"
 #include "module_tcp_synscan.h"
 
-#ifndef HOST
-#define HOST "www.youporn.com"
-#endif
 #define TCP_FLAGS TH_PUSH | TH_ACK
-#define PAYLOAD "GET / HTTP/1.1\r\nHost: "HOST"\r\n\r\n"
-#define PAYLOAD_LEN strlen(PAYLOAD) 
 #define TOTAL_LEN sizeof(struct ip) + sizeof(struct tcphdr)
-#define TOTAL_LEN_PAYLOAD sizeof(struct ip) + sizeof(struct tcphdr) + PAYLOAD_LEN
 #define ETHER_LEN sizeof(struct ether_header)
 #define IP_LEN sizeof(struct ip)
 
-probe_module_t module_tcp_forbiddenscan;
+probe_module_t module_tcp_notfoundscan;
 static uint32_t num_ports;
 
-static int forbiddenscan_global_initialize(struct state_conf *state)
+static int notfoundscan_global_initialize(struct state_conf *state)
 {
-    printf("Starting module. Packet out size: %d\n", TOTAL_LEN_PAYLOAD + TOTAL_LEN);
 	num_ports = state->source_port_last - state->source_port_first + 1;
 	return EXIT_SUCCESS;
 }
 
-static int forbiddenscan_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw,
+static int notfoundscan_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw,
         port_h_t dst_port,
         __attribute__((unused)) void **arg_ptr)
 {
@@ -47,7 +40,7 @@ static int forbiddenscan_init_perthread(void *buf, macaddr_t *src, macaddr_t *gw
 	make_tcp_header(tcp_header, dst_port, TH_SYN);
 	return EXIT_SUCCESS;
 }
-static int forbiddenscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *gw,
+static int notfoundscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *gw,
 				     port_h_t dst_port,
 				     __attribute__((unused)) void **arg_ptr)
 {
@@ -58,12 +51,12 @@ static int forbiddenscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *g
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
 	make_tcp_header(tcp_header, dst_port, TCP_FLAGS);
-	char *payload = (char *)(&tcp_header[1]);
-	memcpy(payload, PAYLOAD, PAYLOAD_LEN);
+	//char *payload = (char *)(&tcp_header[1]);
+	//memcpy(payload, PAYLOAD, PAYLOAD_LEN);
 	return EXIT_SUCCESS;
 }
 
-static int forbiddenscan_make_packet(void *buf, UNUSED size_t *buf_len,
+static int notfoundscan_make_packet(void *buf, UNUSED size_t *buf_len,
         ipaddr_n_t src_ip, ipaddr_n_t dst_ip, uint8_t ttl,
         uint32_t *validation, int probe_num,
         UNUSED void *arg)
@@ -92,9 +85,11 @@ static int forbiddenscan_make_packet(void *buf, UNUSED size_t *buf_len,
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
+	buf_len = TOTAL_LEN;
+
 	return EXIT_SUCCESS;
 }
-static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
+static int notfoundscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 				  ipaddr_n_t src_ip, ipaddr_n_t dst_ip, uint8_t ttl,
 				  uint32_t *validation, int probe_num,
 				  UNUSED void *arg)
@@ -102,6 +97,8 @@ static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
+	char *payload = (char *)(&tcp_header[1]);
+
 	uint32_t tcp_seq = validation[0];
 	uint32_t tcp_ack =
 	    validation[2]; // get_src_port() below uses validation 1 internally.
@@ -110,22 +107,35 @@ static int forbiddenscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 	ip_header->ip_dst.s_addr = dst_ip;
 	ip_header->ip_ttl = ttl;
 
+	char dstip[16];
+	memset(dstip,0,sizeof(char) * 16);
+	strncpy(dstip, inet_ntoa(*ip_header->ip_dst), 15);
+	dstip[16] = '\0';
+
+	char srcpayload[64];
+	memset(srcpayload, 0, sizeof(char) * 64);
+	sprintf(srcpayload, "GET /a HTTP/1.1\r\nHost: %s\r\n\r\n", dstip);
+	int paylen = strlen(srcpayload);
+	strcpy(payload, srcpayload, paylen);
+
 	tcp_header->th_sport =
 	    htons(get_src_port(num_ports, probe_num, validation));
 	tcp_header->th_seq = tcp_seq;
 	tcp_header->th_ack = tcp_ack;
 	tcp_header->th_sum = 0;
-	tcp_header->th_sum =
-	    tcp_checksum(sizeof(struct tcphdr) + PAYLOAD_LEN, ip_header->ip_src.s_addr,
-			 ip_header->ip_dst.s_addr, tcp_header);
+	tcp_header->th_sum = tcp_checksum(sizeof(struct tcphdr) + paylen,
+					  ip_header->ip_src.s_addr,
+					  ip_header->ip_dst.s_addr, tcp_header);
 
 	ip_header->ip_sum = 0;
 	ip_header->ip_sum = zmap_ip_checksum((unsigned short *)ip_header);
 
+	buf_len = TOTAL_LEN + paylen;
+
 	return EXIT_SUCCESS;
 }
 
-static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
+static int notfoundscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
         __attribute__((unused)) uint32_t *src_ip,
         uint32_t *validation)
 {
@@ -151,7 +161,17 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
 		return 0;
 	}
 	    
-    if ((htonl(tcp->th_ack) != htonl(validation[0]) + PAYLOAD_LEN) &&  
+	char dstip[16];
+	memset(dstip,0,sizeof(char) * 16);
+	strncpy(dstip, inet_ntoa(*ip_hdr->ip_src), 15);
+	dstip[16] = '\0';
+
+	char srcpayload[64];
+	memset(srcpayload, 0, sizeof(char) * 64);
+	sprintf(srcpayload, "GET /a HTTP/1.1\r\nHost: %s\r\n\r\n", dstip);
+	int paylen = strlen(srcpayload);
+
+    if ((htonl(tcp->th_ack) != htonl(validation[0]) + paylen) &&  
         (htonl(tcp->th_ack) != htonl(validation[0])) &&
         (htonl(tcp->th_seq) != htonl(validation[2]))) {
         return 0;
@@ -160,14 +180,14 @@ static int forbiddenscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
     int mylen = ntohs(ip_hdr->ip_len);
     int payloadlen = mylen - IP_LEN - (tcp->th_off * 4);
     //accept rate > 5
-    if (payloadlen < ((TOTAL_LEN_PAYLOAD + TOTAL_LEN) * 5)) {
+    if (payloadlen < ((TOTAL_LEN + paylen) * 5)) {
         return 0;
     }
 
 	return 1;
 }
 
-static void forbiddenscan_process_packet(const u_char *packet,
+static void notfoundscan_process_packet(const u_char *packet,
         uint32_t len,
         fieldset_t *fs,
         __attribute__((unused))
@@ -226,21 +246,21 @@ static fielddef_t myfields[] = {
         .type = "bool",
         .desc = "is response considered success"}};
 
-probe_module_t module_forbidden_scan = {
-    .name = "forbidden_scan",
-    .packet_length = TOTAL_LEN + ETHER_LEN,
-    .packet2_length = TOTAL_LEN_PAYLOAD + ETHER_LEN,
+probe_module_t module_notfound_scan = {
+    .name = "notfound_scan",
+    .packet_length = 0,
+    .packet2_length = 0,
     .pcap_filter = "tcp", 
     .pcap_snaplen = 96,
     .port_args = 1,
-    .global_initialize = &forbiddenscan_global_initialize,
-    .thread_initialize = &forbiddenscan_init_perthread,
-    .thread_initialize2 = &forbiddenscan_init_perthread2,
-    .make_packet = &forbiddenscan_make_packet,
-    .make_packet2 = &forbiddenscan_make_packet2,
+    .global_initialize = &notfoundscan_global_initialize,
+    .thread_initialize = &notfoundscan_init_perthread,
+    .thread_initialize2 = &notfoundscan_init_perthread2,
+    .make_packet = &notfoundscan_make_packet,
+    .make_packet2 = &notfoundscan_make_packet2,
     .print_packet = &synscan_print_packet,
-    .process_packet = &forbiddenscan_process_packet,
-    .validate_packet = &forbiddenscan_validate_packet,
+    .process_packet = &notfoundscan_process_packet,
+    .validate_packet = &notfoundscan_validate_packet,
     .close = NULL,
     .helptext = "Probe module that sends a TCP PSH/ACK packet to a specific "
         "port. Possible classifications are: synack and rst. A "

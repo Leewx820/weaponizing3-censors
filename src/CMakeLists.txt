@@ -31,6 +31,7 @@ set(PROBE_MODULE_SOURCES
     probe_modules/module_tcp_synscan.c
     probe_modules/module_tcp_synackscan.c
     probe_modules/module_forbidden_scan.c
+    probe_modules/module_notfound_scan.c
 	#probe_modules/module_tcp_cisco_backdoor.c
     probe_modules/module_udp.c
     probe_modules/packet.c
