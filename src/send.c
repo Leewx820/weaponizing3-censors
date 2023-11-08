@@ -219,9 +219,7 @@ int send_run(sock_t st, shard_t *s)
 	log_debug("send", "send thread started");
 	pthread_mutex_lock(&send_mutex);
 	// Allocate a buffer to hold the outgoing packet
-	char buf[MAX_PACKET_SIZE];
 	char buf2[MAX_PACKET_SIZE];
-	memset(buf, 0, MAX_PACKET_SIZE);
 	memset(buf2, 0, MAX_PACKET_SIZE);
 
 	// OS specific per-thread init
@@ -242,11 +240,6 @@ int send_run(sock_t st, shard_t *s)
 	}
 	log_debug("send", "source MAC address %s", mac_buf);
 	void *probe_data;
-	if (zconf.probe_module->thread_initialize) {
-		zconf.probe_module->thread_initialize(
-		    buf, zconf.hw_mac, zconf.gw_mac, zconf.target_port,
-		    &probe_data);
-	}
 	if (zconf.probe_module->thread_initialize2) {
 		zconf.probe_module->thread_initialize2(
 		    buf2, zconf.hw_mac, zconf.gw_mac, zconf.target_port,
@@ -379,17 +372,12 @@ int send_run(sock_t st, shard_t *s)
 			uint32_t validation[VALIDATE_BYTES / sizeof(uint32_t)];
 			validate_gen(src_ip, current_ip, (uint8_t *)validation);
 			uint8_t ttl = zconf.probe_ttl;
-			size_t length;
+			size_t length2;
 			//= zconf.probe_module->packet_length;
-			zconf.probe_module->make_packet(buf, &length, src_ip,
+			zconf.probe_module->make_packet(buf, &length2, src_ip,
 							current_ip, ttl, validation,
 							i, probe_data);
-			size_t length2;
-			//= zconf.probe_module->packet2_length;
-			zconf.probe_module->make_packet2(buf2, &length2, src_ip,
-							current_ip, ttl, validation,
-							i, probe_data);		
-			if (length > MAX_PACKET_SIZE) {
+			if (length2 > MAX_PACKET_SIZE) {
 				log_fatal(
 				    "send",
 				    "send thread %hhu set length (%zu) larger than MAX (%zu)",
@@ -398,17 +386,13 @@ int send_run(sock_t st, shard_t *s)
 			if (zconf.dryrun) {
 				lock_file(stdout);
 				zconf.probe_module->print_packet(stdout, buf);
-				zconf.probe_module->print_packet(stdout, buf2);
 				unlock_file(stdout);
 			} else {
-				void *contents = buf + zconf.send_ip_pkts * sizeof(struct ether_header);
-				length -= (zconf.send_ip_pkts * sizeof(struct ether_header));
-                void *contents2 = buf2 + zconf.send_ip_pkts * sizeof(struct ether_header);
+				void *contents = buf2 + zconf.send_ip_pkts * sizeof(struct ether_header);
 				length2 -= (zconf.send_ip_pkts * sizeof(struct ether_header));
-				
 				int any_sends_successful = 0;
 				for (int i = 0; i < attempts; ++i) {
-					int rc = send_packet(st, contents, length, idx);
+					int rc = send_packet(st, contents, length2, idx);
 					if (rc < 0) {
 						struct in_addr addr;
 						addr.s_addr = current_ip;
@@ -418,18 +402,7 @@ int send_run(sock_t st, shard_t *s)
 							log_debug("send","send_packet failed for %s. %s", addr_str, strerror(errno));
 						}
 					} 
-                    idx++;
-                    int rc2 = send_packet(st, contents2, length2, idx);
-					if (rc2 < 0) {
-						struct in_addr addr2;
-						addr2.s_addr = current_ip;
-						char addr_str_buf2[INET_ADDRSTRLEN];
-						const char *addr_str2 = inet_ntop(AF_INET, &addr2, addr_str_buf2, INET_ADDRSTRLEN);
-						if (addr_str2 != NULL) {
-							log_debug("send","send_packet failed for %s. %s", addr_str2, strerror(errno));
-						}
-					} 
-                    if (rc2 >= 0 && rc >= 0) {
+                    if (rc >= 0) {
 						any_sends_successful = 1;
 						break;
 					}
