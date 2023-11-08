@@ -47,7 +47,7 @@ static int notfoundscan_init_perthread2(void *buf, macaddr_t *src, macaddr_t *gw
 	struct ether_header *eth_header = (struct ether_header *)buf;
 	make_eth_header(eth_header, src, gw);
 	struct ip *ip_header = (struct ip *)(&eth_header[1]);
-	uint16_t len = htons(sizeof(struct ip) + sizeof(struct tcphdr) + PAYLOAD_LEN);
+	uint16_t len = htons(sizeof(struct ip) + sizeof(struct tcphdr));
 	make_ip_header(ip_header, IPPROTO_TCP, len);
 	struct tcphdr *tcp_header = (struct tcphdr *)(&ip_header[1]);
 	make_tcp_header(tcp_header, dst_port, TCP_FLAGS);
@@ -116,7 +116,9 @@ static int notfoundscan_make_packet2(void *buf, UNUSED size_t *buf_len,
 	memset(srcpayload, 0, sizeof(char) * 64);
 	sprintf(srcpayload, "GET /a HTTP/1.1\r\nHost: %s\r\n\r\n", dstip);
 	int paylen = strlen(srcpayload);
-	strcpy(payload, srcpayload, paylen);
+	memcpy(payload, srcpayload, paylen);
+
+	ip_header.ip_len += paylen;
 
 	tcp_header->th_sport =
 	    htons(get_src_port(num_ports, probe_num, validation));
