@@ -201,6 +201,15 @@ static void notfoundscan_process_packet(const u_char *packet,
     int payloadlen = mylen - IP_LEN - (tcp->th_off * 4);
     mylen += ETHER_LEN;
 
+	char dstip[16];
+	memset(dstip,0,sizeof(char) * 16);
+	strncpy(dstip, inet_ntoa(*ip_hdr->ip_src), 15);
+	dstip[16] = '\0';
+
+	char srcpayload[64];
+	memset(srcpayload, 0, sizeof(char) * 64);
+	sprintf(srcpayload, "GET /a HTTP/1.1\r\nHost: %s\r\n\r\n", dstip);
+	int paylen = strlen(srcpayload);
 
 	fs_add_uint64(fs, "sport", (uint64_t)ntohs(tcp->th_sport));
 	fs_add_uint64(fs, "dport", (uint64_t)ntohs(tcp->th_dport));
@@ -214,7 +223,7 @@ static void notfoundscan_process_packet(const u_char *packet,
     // Attempt to track why an IP responded - did it acknolwedge our payload or not? 
     // If it acknowledges our payload, than it is probably responding to our payload
     // otherwise, it may just be sending us SYN/ACKs or responses
-    if (htonl(tcp->th_ack) == htonl(validation[0]) + PAYLOAD_LEN) {
+    if (htonl(tcp->th_ack) == htonl(validation[0]) + paylen) {
 	    fs_add_uint64(fs, "validation_type", 0);
     } else if ((htonl(tcp->th_ack) == htonl(validation[0])) ||
                (htonl(tcp->th_seq) == htonl(validation[2]))) {
