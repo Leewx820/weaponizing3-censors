@@ -159,7 +159,7 @@ static int notfoundscan_validate_packet(const struct ip *ip_hdr, uint32_t len,
     int mylen = ntohs(ip_hdr->ip_len);
     int payloadlen = mylen - IP_LEN - (tcp->th_off * 4);
     //accept rate > 5
-    if (payloadlen < ((TOTAL_LEN + paylen) * 5)) {
+    if (payloadlen < ((TOTAL_LEN + PAYLOAD_LEN) * 5)) {
         return 0;
     }
 
